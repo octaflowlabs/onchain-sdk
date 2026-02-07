@@ -1,6 +1,6 @@
 {
   "name": "@octaflowlabs/onchain-sdk",
-  "version": "1.0.0-test17",
+  "version": "1.0.0-test18",
   "description": "onchain methods for web3",
   "repository": "https://github.com/crisramb665/onchain-sdk.git",
   "license": "MIT",
