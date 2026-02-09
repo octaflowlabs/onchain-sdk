@@ -1,6 +1,3 @@
-/** npm imports */
-import { TransactionReceipt } from 'ethers'
-
 /** local imports */
 import { getProvider } from './getProvider'
 import { TxStatusOptions, TxStatusResponse } from '../types/common'
