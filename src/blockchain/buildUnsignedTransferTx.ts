@@ -10,10 +10,14 @@ import {
   BuildUnsignedTransferTxOptions,
   UnsignedTransferTxResponse,
 } from '../types/common'
+import { ensurePublicHost, testJsonRpc } from '../rpc'
 
 export const buildUnsignedTransferTx = async (
   options: BuildUnsignedTransferTxOptions,
 ): Promise<UnsignedTransferTxResponse> => {
+  await ensurePublicHost(options.rpcUrl)
+  await testJsonRpc(options.rpcUrl, 'eth_chainId', [])
+
   const provider = getProvider(options.rpcUrl, options.chainId)
   if (!provider) throw new Error('Could not create provider with given rpcUrl and chainId')
 

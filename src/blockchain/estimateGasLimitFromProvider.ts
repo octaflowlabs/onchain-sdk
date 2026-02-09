@@ -47,6 +47,13 @@ export const estimateGasLimitFromProvider = async ({
     const bufferPercentage = Math.min(Math.max(Math.round(congestionFactor * 5), 5), 30) // 5% to 30% buffer
     const newGasLimit = gasEstimated + (gasEstimated * BigInt(bufferPercentage)) / BigInt(100)
 
+    // let suggested: GasFeesApiResponse | undefined = undefined
+    // try {
+    //   suggested = await this.getSuggestedGasPrice((await provider.getNetwork()).chainId)
+    // } catch {
+    //   suggested = undefined
+    // }
+
     return {
       gasEstimated,
       gasLimit: newGasLimit,

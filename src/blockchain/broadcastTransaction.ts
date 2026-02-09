@@ -5,6 +5,7 @@ import { Transaction } from 'ethers'
 import { getProvider } from './getProvider'
 import { BroadcastTransactionOptions } from '../types/common'
 import { errorMessagesForBroadcast, handleErrorMessages } from '../utils/handleErrorMessages'
+import { ensurePublicHost, testJsonRpc } from '../rpc'
 
 export const broadcastTransaction = async ({
   signedTx,
@@ -12,6 +13,9 @@ export const broadcastTransaction = async ({
   chainId,
   waitConfirmations = 0,
 }: BroadcastTransactionOptions): Promise<string> => {
+  await ensurePublicHost(rpcUrl)
+  await testJsonRpc(rpcUrl, 'eth_chainId', [])
+
   const provider = getProvider(rpcUrl, chainId)
   if (!provider) throw new Error('Could not create provider with given rpcUrl')
 
