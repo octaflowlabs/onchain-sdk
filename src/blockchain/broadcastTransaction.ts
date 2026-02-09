@@ -4,6 +4,7 @@ import { Transaction } from 'ethers'
 /** local imports */
 import { getProvider } from './getProvider'
 import { BroadcastTransactionOptions } from '../types/common'
+import { errorMessagesForBroadcast, handleErrorMessages } from '../utils/handleErrorMessages'
 
 export const broadcastTransaction = async ({
   signedTx,
@@ -17,7 +18,10 @@ export const broadcastTransaction = async ({
   try {
     Transaction.from(signedTx)
   } catch (error: any) {
-    console.error('Invalid signed transaction format:', error)
+    handleErrorMessages({
+      e: error,
+      message: errorMessagesForBroadcast[error.code] || 'Invalid signed transaction format',
+    })
     throw new Error('Invalid signed transaction format' + (error?.message || error || ''))
   }
 
@@ -29,7 +33,10 @@ export const broadcastTransaction = async ({
 
     return txHash
   } catch (error: any) {
-    console.error('Error computing transaction hash:', error)
+    handleErrorMessages({
+      e: error,
+      message: errorMessagesForBroadcast[error.code] || 'Failed to broadcast transaction',
+    })
     throw new Error(error?.message || error || 'Failed to broadcast transaction')
   }
 }

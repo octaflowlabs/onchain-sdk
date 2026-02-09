@@ -3,6 +3,10 @@ import { TransactionRequest } from 'ethers'
 
 /** local imports */
 import { EstimateGasLimitFromProviderProps, GasEstimateResult } from '../types/common'
+import {
+  errorMessagesForGasLimitEstimation,
+  handleErrorMessages,
+} from '../utils/handleErrorMessages'
 
 export const estimateGasLimitFromProvider = async ({
   provider,
@@ -56,7 +60,10 @@ export const estimateGasLimitFromProvider = async ({
       // suggestedGasFees: suggested,
     }
   } catch (error: any) {
-    console.error('Unable to estimate gas limit: ', error)
+    handleErrorMessages({
+      e: error,
+      message: errorMessagesForGasLimitEstimation[error.code] || 'Failed to estimate gas limit',
+    })
     console.log(`Setting default gas limit to: ${defaultGasLimit}`)
 
     const feeData = lastFeeData

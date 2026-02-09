@@ -25,11 +25,16 @@ export { EntropySource } from './services/evm-wallet-core/entropy'
 export { createWallet, signMessage, signTransaction } from './services/evm-wallet-core/signer'
 
 /** utils exports */
-export { getShortenTransactionHash } from './utils/getShortenTxHash'
+export { getShortenTransactionHashOrAddress, getShortenData } from './utils/getShortenTxHash'
 export { transformBigInt } from './utils/transformBigInt'
 import NATIVE_TOKENS from './utils/tokens'
 export { NATIVE_TOKENS }
 export { formattedAmountForDisplay, parsedAmount } from './utils/formatAmount'
+export {
+  handleErrorMessages,
+  errorMessagesForBroadcast,
+  errorMessagesForGasLimitEstimation,
+} from './utils/handleErrorMessages'
 
 /** types exports */
 export {
