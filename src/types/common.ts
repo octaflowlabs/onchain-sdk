@@ -97,4 +97,48 @@ export interface FormatAmountOptions {
   maxDisplayDigits?: number
 }
 
+// & Transaction Request
 export type { TransactionRequest }
+
+// & Get Balance interfaces
+export interface GetBalanceParams {
+  walletAddress: string
+  rpcUrl: string
+  tokenAddress?: string
+  chainId?: number
+}
+
+export interface GetBalancesChainRequest {
+  rpcUrl: string
+  chainId?: number
+  tokenAddresses: string[]
+  includeNative?: boolean
+}
+
+export interface GetBalancesParams {
+  walletAddress: string
+  chains: GetBalancesChainRequest[]
+}
+
+export interface TokenBalance {
+  tokenAddress: string | null
+  balance: bigint | null
+  error?: unknown
+}
+
+export interface ChainBalances {
+  chainId?: number
+  balances: TokenBalance[]
+}
+
+export interface GetBalanceResult {
+  walletAddress: string
+  chains: ChainBalances[]
+}
+
+export interface ChainGroup {
+  rpcUrl: string
+  chainId?: number
+  nativeBalanceRequests: GetBalanceParams[]
+  tokenBalanceRequests: GetBalanceParams[]
+}
