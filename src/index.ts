@@ -3,7 +3,7 @@ import ERC20_TOKEN_CONTRACT_ABI from './ABIs/ERC20_TOKEN_CONTRACT_ABI'
 export { ERC20_TOKEN_CONTRACT_ABI }
 
 /** constants exports */
-export { GAS_LIMIT_PER_TX_TYPE } from './constants/constants'
+export { GAS_LIMIT_PER_TX_TYPE, MULTICALL3_ADDRESS } from './constants/constants'
 
 /** basic blockchain exports */
 export {
@@ -14,6 +14,7 @@ export { broadcastTransaction } from './blockchain/broadcastTransaction'
 export { estimateGasLimitFromProvider } from './blockchain/estimateGasLimitFromProvider'
 export { getProvider } from './blockchain/getProvider'
 export { txStatus } from './blockchain/txStatus'
+export { getBalance, getBalances } from './blockchain/getBalances'
 
 /** services exports */
 export {
@@ -53,4 +54,11 @@ export {
   UnsignedTransferTxResponse,
   FormatAmountOptions,
   TransactionRequest,
+  GetBalanceParams,
+  GetBalancesParams,
+  GetBalancesChainRequest,
+  GetBalanceResult,
+  ChainBalances,
+  TokenBalance,
+  ChainGroup,
 } from './types/common'

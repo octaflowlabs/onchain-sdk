@@ -19,9 +19,8 @@ export const formattedAmountForDisplay = (
   } = options
 
   const formattedAmount = formatUnits(amount, decimals)
-  if (formattedAmount.startsWith('-')) {
-    throw new Error('Negative balances are not supported')
-  }
+  if (formattedAmount.startsWith('-')) throw new Error('Negative balances are not supported')
+
   const [wholePart = '0', fractionPart = ''] = formattedAmount.split('.')
 
   if (wholePart.length >= maxDisplayDigits) {
