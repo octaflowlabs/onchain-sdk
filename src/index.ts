@@ -38,9 +38,6 @@ export {
 } from './utils/handleErrorMessages'
 export { normalizeAddress } from './utils/normalizeAddress'
 
-/** rpc exports */
-export { validateRpcUrl, ensurePublicHost, testJsonRpc } from './rpc/index'
-
 /** types exports */
 export {
   BroadcastTransactionOptions,
