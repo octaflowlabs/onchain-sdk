@@ -47,6 +47,22 @@ ABIs and constants
 - Multicall3 ABI and address for batched reads.
 - Gas limit defaults per transaction type.
 
+Networks registry
+
+- The SDK includes a predefined networks registry in `src/constants/NETWORKS_REGISTRY.ts`.
+- Networks are grouped by `category` (for example: `popular`, `custom`).
+- Each network entry includes:
+	- `id`: stable internal identifier.
+	- `name`: human-readable network name.
+	- `chainId`: EVM chain ID.
+	- `rpcUrl`: primary RPC endpoint.
+	- `failoverRpcUrl` (optional): fallback RPC endpoint.
+	- `explorerUrl`: block explorer base URL.
+	- `iconUrl`: network icon URL.
+	- `symbol`: native currency symbol.
+- This registry is useful for network selection UIs, chain metadata lookup, and RPC fallback handling.
+- You can use `chainId` with SDK helpers and pass `rpcUrl` (or `failoverRpcUrl`) to provider-based calls.
+
 ## Design notes
 
 - The SDK is stateless and transport-agnostic. It expects a caller-provided RPC URL.
