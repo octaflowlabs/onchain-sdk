@@ -22,12 +22,56 @@ export interface GasEstimateResult {
   //   suggestedGasFees?: GasFeesApiResponse
 }
 
+export interface EstimateTransactionOptions {
+  rpcUrl: string
+  chainId: number
+  tx: TransactionRequest
+  fromAddress: string
+  defaultGasLimit?: bigint
+}
+
+export interface PrepareTransactionParams extends EstimateTransactionOptions {}
+
+export interface EstimateTransactionResult {
+  gasLimit: bigint
+  gasEstimated: bigint
+  feeData: {
+    maxFeePerGas?: bigint
+    maxPriorityFeePerGas?: bigint
+    gasPrice?: bigint
+  }
+  gasReserve?: bigint
+  humanReadableGasReserve: string
+  bufferPercentage: number
+}
+
+export interface PrepareTransactionResult {
+  unsignedTx: TransactionRequest
+  nonce: number
+  gasEstimated: bigint
+  gasLimit: bigint
+  gasReserve?: bigint
+  bufferPercentage: number
+  feeData: {
+    maxFeePerGas?: bigint
+    maxPriorityFeePerGas?: bigint
+    gasPrice?: bigint
+  }
+  humanReadableGasReserve: string
+}
+
 // & Build Unsigned Transfer Tx interfaces
+export interface BuildBaseUnsignedTransferTxParams {
+  recipientAddress: string
+  value: string
+  tokenAddress?: string
+  tokenDecimals?: number
+}
+
 export interface BuildUnsignedTransferTxOptions {
   fromAddress: string
   toAddress: string
   value?: string
-  data?: string
   tokenAddress?: string
   tokenDecimals?: number
   rpcUrl: string
@@ -35,36 +79,11 @@ export interface BuildUnsignedTransferTxOptions {
   defaultGasLimit: bigint //TODO: use defaultGasLimit per transaction type when this scales
 }
 
-export interface UnsignedTransferTxResponse {
-  unsignedTx: TransactionRequest
-  nonce: number
-  gasEstimated: string
-  gasLimit: string
-  gasReserve?: string
-  bufferPercentage: number
-  feeData: {
-    maxFeePerGas?: string
-    maxPriorityFeePerGas?: string
-    gasPrice?: string
-  }
-  //   suggestedGasFees?: any
-  //   humanReadableFees?: {
-  //     low?: { maxFeePerGasGwei: string; maxPriorityFeePerGasGwei: string }
-  //     medium?: { maxFeePerGasGwei: string; maxPriorityFeePerGasGwei: string }
-  //     high?: { maxFeePerGasGwei: string; maxPriorityFeePerGasGwei: string }
-  //   }
-}
-
 export interface BuildMaxNativeTransferTxOptions extends Omit<
   BuildUnsignedTransferTxOptions,
-  'value' | 'tokenAddress' | 'tokenDecimals'
+  'value' | 'tokenDecimals'
 > {
   balance: string
-  tokenAddress?: string
-}
-
-export interface BuildMaxNativeTransferTxResponse extends UnsignedTransferTxResponse {
-  sendableValue: string
 }
 
 // & Broadcast Transaction interfaces

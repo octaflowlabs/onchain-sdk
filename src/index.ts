@@ -8,6 +8,7 @@ export { NETWORKS_REGISTRY, NetworkField, NetworkRegistry } from './constants/NE
 
 /** basic blockchain exports */
 export {
+  buildBaseUnsignedTransferTx,
   buildMaxNativeTransferTx,
   buildUnsignedTransferTx,
 } from './blockchain/buildUnsignedTransferTx'
@@ -16,6 +17,8 @@ export { estimateGasLimitFromProvider } from './blockchain/estimateGasLimitFromP
 export { getProvider } from './blockchain/getProvider'
 export { txStatus } from './blockchain/txStatus'
 export { getBalance, getBalances } from './blockchain/getBalances'
+export { estimateTransaction } from './blockchain/estimateTransaction'
+export { prepareTransaction } from './blockchain/prepareTransaction'
 
 /** services exports */
 export {
@@ -43,13 +46,16 @@ export { normalizeAddress } from './utils/normalizeAddress'
 export {
   BroadcastTransactionOptions,
   BuildMaxNativeTransferTxOptions,
-  BuildMaxNativeTransferTxResponse,
   BuildUnsignedTransferTxOptions,
   EstimateGasLimitFromProviderProps,
   GasEstimateResult,
   TxStatusOptions,
+  BuildBaseUnsignedTransferTxParams,
   TxStatusResponse,
-  UnsignedTransferTxResponse,
+  EstimateTransactionOptions,
+  EstimateTransactionResult,
+  PrepareTransactionParams,
+  PrepareTransactionResult,
   FormatAmountOptions,
   TransactionRequest,
   GetBalanceParams,
