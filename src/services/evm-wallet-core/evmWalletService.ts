@@ -1,5 +1,5 @@
 /** npm imports */
-import { Wallet, HDNodeWallet, Mnemonic } from 'ethers'
+import { Wallet, HDNodeWallet, Mnemonic, getAddress } from 'ethers'
 
 /** local imports */
 import { EntropySource } from './entropy'
@@ -97,6 +97,26 @@ export class EvmWalletService {
     }
   }
 
+  public getFirstAvailableIndexForMnemonicImport(
+    mnemonic: string,
+    existingAddresses: string[],
+    maxIndicesToCheck: number = 20,
+  ): { index: number; wallet: EvmDerivedWallet } | null {
+    this.validateMnemonic(mnemonic)
+
+    const existingSet = new Set(existingAddresses.map((addr) => getAddress(addr)))
+
+    for (let i = 0; i < maxIndicesToCheck; i++) {
+      const wallet = this.deriveWalletFromMnemonic(mnemonic, i)
+      const normalizedAddress = getAddress(wallet.address)
+      if (!existingSet.has(normalizedAddress)) {
+        return { index: i, wallet }
+      }
+    }
+
+    return null
+  }
+
   public async signMessage(privateKey: string, message: string): Promise<string> {
     const wallet = new Wallet(privateKey)
     return await wallet.signMessage(message)
@@ -112,9 +132,7 @@ export class EvmWalletService {
   }
 
   private validateMnemonic(mnemonic: string): void {
-    if (!this.isValidMnemonic(mnemonic)) {
-      throw new Error('Invalid mnemonic phrase')
-    }
+    if (!this.isValidMnemonic(mnemonic)) throw new Error('Invalid mnemonic phrase')
   }
 
   private getEntropyForWordCount(wordCount: 12 | 15 | 18 | 21 | 24): number {
