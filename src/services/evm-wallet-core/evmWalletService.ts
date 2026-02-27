@@ -1,5 +1,5 @@
 /** npm imports */
-import { Wallet, HDNodeWallet, Mnemonic } from 'ethers'
+import { Wallet, HDNodeWallet, Mnemonic, getAddress } from 'ethers'
 
 /** local imports */
 import { EntropySource } from './entropy'
@@ -95,6 +95,27 @@ export class EvmWalletService {
       privateKey: wallet.privateKey,
       publicKey: wallet.signingKey.publicKey,
     }
+  }
+
+  public getFirstAvailableIndexForMnemonicImport(
+    mnemonic: string,
+    existingAddresses: string[],
+    maxIndicesToCheck: number = 20,
+  ): { index: number; wallet: EvmDerivedWallet } | null {
+    console.log('Running getFirstAvailableIndexForMnemonicImport, mnemonic:', mnemonic)
+    this.validateMnemonic(mnemonic)
+
+    const existingSet = new Set(existingAddresses.map((addr) => getAddress(addr)))
+
+    for (let i = 0; i < maxIndicesToCheck; i++) {
+      const wallet = this.deriveWalletFromMnemonic(mnemonic, i)
+      const normalizedAddress = getAddress(wallet.address)
+      if (!existingSet.has(normalizedAddress)) {
+        return { index: i, wallet }
+      }
+    }
+
+    return null
   }
 
   public async signMessage(privateKey: string, message: string): Promise<string> {
