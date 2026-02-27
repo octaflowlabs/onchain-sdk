@@ -102,7 +102,6 @@ export class EvmWalletService {
     existingAddresses: string[],
     maxIndicesToCheck: number = 20,
   ): { index: number; wallet: EvmDerivedWallet } | null {
-    console.log('Running getFirstAvailableIndexForMnemonicImport, mnemonic:', mnemonic)
     this.validateMnemonic(mnemonic)
 
     const existingSet = new Set(existingAddresses.map((addr) => getAddress(addr)))
@@ -133,9 +132,7 @@ export class EvmWalletService {
   }
 
   private validateMnemonic(mnemonic: string): void {
-    if (!this.isValidMnemonic(mnemonic)) {
-      throw new Error('Invalid mnemonic phrase')
-    }
+    if (!this.isValidMnemonic(mnemonic)) throw new Error('Invalid mnemonic phrase')
   }
 
   private getEntropyForWordCount(wordCount: 12 | 15 | 18 | 21 | 24): number {
