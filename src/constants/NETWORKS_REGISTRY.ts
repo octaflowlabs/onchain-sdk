@@ -1,6 +1,7 @@
 export interface NetworkField {
   id: string
   name: string
+  nameForDisplay: string
   chainId: number
   rpcUrl: string
   explorerUrl: string
@@ -20,7 +21,8 @@ export const NETWORKS_REGISTRY: NetworkRegistry[] = [
     networks: [
       {
         id: 'ethereum-mainnet',
-        name: 'Ethereum Mainnet',
+        name: 'eth-mainnet',
+        nameForDisplay: 'Ethereum Mainnet',
         chainId: 1,
         rpcUrl: 'https://ethereum-rpc.publicnode.com',
         explorerUrl: 'https://etherscan.io',
@@ -30,7 +32,8 @@ export const NETWORKS_REGISTRY: NetworkRegistry[] = [
       },
       {
         id: 'bnb-smart-chain',
-        name: 'BNB Smart Chain',
+        name: 'bnb-mainnet',
+        nameForDisplay: 'BNB Smart Chain',
         chainId: 56,
         rpcUrl: 'https://bsc-dataseed.bnbchain.org',
         explorerUrl: 'https://bscscan.com/',
@@ -40,7 +43,8 @@ export const NETWORKS_REGISTRY: NetworkRegistry[] = [
       },
       {
         id: 'polygon-mainnet',
-        name: 'Polygon Mainnet',
+        name: 'polygon-mainnet',
+        nameForDisplay: 'Polygon Mainnet',
         iconUrl: 'https://assets.coingecko.com/coins/images/4713/large/matic-token-icon.png',
         chainId: 137,
         rpcUrl: 'https://polygon.publicnode.com',
@@ -50,7 +54,8 @@ export const NETWORKS_REGISTRY: NetworkRegistry[] = [
       },
       {
         id: 'arbitrum-mainnet',
-        name: 'Arbitrum Mainnet',
+        name: 'arb-mainnet',
+        nameForDisplay: 'Arbitrum Mainnet',
         chainId: 42161,
         rpcUrl: 'https://public-arb-mainnet.fastnode.io',
         explorerUrl: 'https://arbiscan.io',
@@ -66,7 +71,8 @@ export const NETWORKS_REGISTRY: NetworkRegistry[] = [
     networks: [
       {
         id: 'sepolia-eth',
-        name: 'Sepolia Testnet',
+        name: 'eth-sepolia',
+        nameForDisplay: 'ETH Sepolia Testnet',
         chainId: 11155111,
         rpcUrl: 'https://ethereum-sepolia-rpc.publicnode.com',
         explorerUrl: 'https://sepolia.etherscan.io',
