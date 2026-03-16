@@ -51,17 +51,18 @@ export class EvmWalletService {
 
     const wallets: EvmDerivedWallet[] = []
     const mnemonicObject = Mnemonic.fromPhrase(mnemonic)
+    const rootNode = HDNodeWallet.fromMnemonic(mnemonicObject, this.DEFAULT_DERIVATION_PATH)
 
     for (let i = 0; i < count; i++) {
       const accountIndex = startIndex + i
+      const child = rootNode.deriveChild(accountIndex)
       const path = `${this.DEFAULT_DERIVATION_PATH}/${accountIndex}`
-      const hdNode = HDNodeWallet.fromMnemonic(mnemonicObject, path)
 
       wallets.push({
-        address: hdNode.address,
-        privateKey: hdNode.privateKey,
+        address: child.address,
+        privateKey: child.privateKey,
         path,
-        publicKey: hdNode.publicKey,
+        publicKey: child.publicKey,
       })
     }
 
