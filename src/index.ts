@@ -24,7 +24,7 @@ export {
 } from './blockchain/buildUnsignedTransferTx'
 export { broadcastTransaction } from './blockchain/broadcastTransaction'
 export { estimateGasLimitFromProvider } from './blockchain/estimateGasLimitFromProvider'
-export { getProvider, getDefaultRpc } from './blockchain/getProvider'
+export { getProvider } from './blockchain/getProvider'
 export { txStatus } from './blockchain/txStatus'
 export { getBalance, getBalances } from './blockchain/getBalances'
 export { estimateTransaction } from './blockchain/estimateTransaction'
