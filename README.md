@@ -1,69 +1,121 @@
 # onchain-sdk
 
 Lightweight TypeScript SDK for EVM onchain utilities. It provides helpers for
-balances, transaction building, broadcasting, gas estimation, and wallet
-derivation.
+balances, transaction building, broadcasting, gas estimation, wallet derivation,
+and amount formatting.
 
 ## Install
 
-Install with npm or yarn.
+```bash
+npm install @octaflowlabs/onchain-sdk
+# or
+yarn add @octaflowlabs/onchain-sdk
+```
 
 ## How to use
 
-- Add the package to the project and import the helpers needed.
+```ts
+import {
+  getProvider,
+  getBalance,
+  buildUnsignedTransferTx,
+  broadcastTransaction,
+} from '@octaflowlabs/onchain-sdk'
+```
+
 - Provide a valid RPC URL (public or private) and the target chain ID.
 - Call the balance, transaction, or signing helpers based on your flow.
 - Handle errors at the call site and decide how often to poll or refresh.
 
-## What this SDK provides
+## API reference
 
-Balances
+### Balances
 
-- Fetch native token balances for an address.
-- Fetch ERC-20 token balances for an address.
-- Fetch multiple token balances across multiple chains with multicall batching.
+| Export | Signature | Description |
+|---|---|---|
+| `getBalance` | `(params: GetBalanceParams) => Promise<bigint \| undefined>` | Fetch native or ERC-20 balance for a single token on one chain. |
+| `getBalances` | `(params: GetBalancesParams) => Promise<GetBalanceResult>` | Batch-fetch balances across multiple chains using Multicall3 aggregation with automatic fallback to individual calls. |
 
-Transactions
+### Transactions
 
-- Build unsigned native or ERC-20 transfer transactions.
-- Estimate gas limits and fee data from a provider.
-- Broadcast signed transactions.
-- Check transaction status and receipt confirmation.
+| Export | Signature | Description |
+|---|---|---|
+| `buildBaseUnsignedTransferTx` | `(params: BuildBaseUnsignedTransferTxParams) => { to, data, value }` | Build the core `to`/`data`/`value` fields for a native or ERC-20 transfer. |
+| `buildUnsignedTransferTx` | `(options: BuildUnsignedTransferTxOptions) => Promise<PrepareTransactionResult>` | Build a complete unsigned transfer transaction with gas estimation. |
+| `buildMaxNativeTransferTx` | `(options: BuildMaxNativeTransferTxOptions) => Promise<string>` | Calculate the maximum sendable native amount after reserving gas. |
+| `estimateGasLimitFromProvider` | `(props: EstimateGasLimitFromProviderProps) => Promise<GasEstimateResult>` | Estimate gas limit with dynamic congestion-based buffering (5–30%). |
+| `estimateTransaction` | `(options: EstimateTransactionOptions) => Promise<EstimateTransactionResult>` | Estimate total transaction cost including gas reserve. |
+| `prepareTransaction` | `(params: PrepareTransactionParams) => Promise<PrepareTransactionResult>` | Full transaction preparation: estimation + nonce + fee data, ready for signing. |
+| `broadcastTransaction` | `(options: BroadcastTransactionOptions) => Promise<string>` | Broadcast a signed transaction and optionally wait for confirmations. Returns the tx hash. |
+| `txStatus` | `(options: TxStatusOptions) => Promise<TxStatusResponse>` | Check transaction status and retrieve the receipt. |
 
-Wallets and signing
+### Provider
 
-- Generate and derive EVM wallets from entropy.
-- Sign messages and transactions.
+| Export | Signature | Description |
+|---|---|---|
+| `getProvider` | `(rpcUrl: string, chainId?: number) => JsonRpcProvider \| undefined` | Create an ethers `JsonRpcProvider` with optional static network. |
+| `getDefaultRpc` | `(networkId: NetworkId) => string` | Return the default RPC URL for a registered network. |
 
-Utilities
+### Wallet and signing
 
-- Format and parse amounts for display.
-- Normalize addresses and shorten hashes.
-- Transform bigint values for UI use.
+| Export | Signature | Description |
+|---|---|---|
+| `EvmWalletService` | `class` | HD wallet service: generate wallets, derive from mnemonic or private key, find next available index, sign messages, validate mnemonics. Accepts an `EntropySource` for randomness. |
+| `createWallet` | `(privateKey: string, rpcUrl?: string) => Wallet` | Create an ethers `Wallet` instance from a private key. |
+| `signMessage` | `(privateKey: string, message: string) => Promise<string>` | Sign an arbitrary message. |
+| `signTransaction` | `(privateKey: string, tx: TransactionRequest, rpcUrl?: string) => Promise<string>` | Sign a transaction and return the serialized signed payload. |
 
-ABIs and constants
+### Utilities
 
-- ERC-20 ABI for balance and transfer calls.
-- Multicall3 ABI and address for batched reads.
-- Gas limit defaults per transaction type.
+| Export | Signature | Description |
+|---|---|---|
+| `formattedAmountForDisplay` | `(amount, decimals, options?) => string` | Locale-aware formatting with group separators, scientific notation for large numbers, and threshold display for tiny amounts. |
+| `parsedAmount` | `(amount: string, decimals: number) => bigint` | Parse a human-readable amount string into its smallest-unit `bigint`. |
+| `normalizeAddress` | `(address: string) => string` | Validate and checksum an Ethereum address. |
+| `getShortenTransactionHashOrAddress` | `(value, first?, last?) => string` | Shorten a tx hash or address (e.g. `0xAbCd…1234`). |
+| `getShortenData` | `(data, first?, last?) => string` | Shorten arbitrary hex data. |
+| `transformBigInt` | `(obj: ContractTransaction) => object` | Convert all `bigint` properties to strings for JSON serialization. |
+| `handleErrorMessages` | `(options: { e, message }) => void` | Log structured ethers errors with detailed context. |
 
-Networks registry
+### Constants
 
-- The SDK includes a predefined networks registry in `src/constants/NETWORKS_REGISTRY.ts`.
-- Networks are grouped by `category` (for example: `popular`, `custom`).
-- Each network entry includes:
-	- `id`: stable internal identifier.
-	- `name`: human-readable network name.
-	- `chainId`: EVM chain ID.
-	- `rpcUrl`: primary RPC endpoint.
-	- `failoverRpcUrl` (optional): fallback RPC endpoint.
-	- `explorerUrl`: block explorer base URL.
-	- `iconUrl`: network icon URL.
-	- `symbol`: native currency symbol.
-- This registry is useful for network selection UIs, chain metadata lookup, and RPC fallback handling.
-- You can use `chainId` with SDK helpers and pass `rpcUrl` (or `failoverRpcUrl`) to provider-based calls.
+| Export | Description |
+|---|---|
+| `GAS_LIMIT_PER_TX_TYPE` | Default gas limits: native transfer (`21 000n`), ERC-20 transfer (`65 000n`), approval (`100 000n`). |
+| `MULTICALL3_ADDRESS` | Canonical Multicall3 contract address. |
+| `ERC20_TOKEN_CONTRACT_ABI` | Standard ERC-20 ABI (`balanceOf`, `transfer`, `approve`, `allowance`, `decimals`, etc.). |
+| `NATIVE_TOKENS` | Native token metadata by chain (ETH, BNB, POL). |
+
+### Networks registry
+
+The SDK ships a built-in networks registry (`NETWORKS`) covering Ethereum, BSC, Polygon, Arbitrum, and Sepolia.
+
+| Export | Description |
+|---|---|
+| `NETWORKS` | `Record<NetworkId, NetworkField>` — full network config map. |
+| `getNetworksByCategory` | `(category: NetworkCategory) => NetworkField[]` — filter by `popular`, `custom`, or `testnet`. |
+
+Each `NetworkField` entry includes `id`, `name`, `chainId`, `rpcUrl`, optional `failoverRpcUrl`, `explorerUrl`, `iconUrl`, and `symbol`.
+
+### Tokens registry
+
+| Export | Description |
+|---|---|
+| `BASIC_TOKENS_BY_CHAIN` | Hardcoded ERC-20 token metadata (USDC, USDT, etc.) grouped by chain ID for Ethereum, BSC, Polygon, and Arbitrum. |
+
+### Types
+
+All interfaces and type aliases are exported for consumer use:
+
+`BroadcastTransactionOptions`, `BuildMaxNativeTransferTxOptions`, `BuildUnsignedTransferTxOptions`, `BuildBaseUnsignedTransferTxParams`, `EstimateGasLimitFromProviderProps`, `GasEstimateResult`, `EstimateTransactionOptions`, `EstimateTransactionResult`, `PrepareTransactionParams`, `PrepareTransactionResult`, `TxStatusOptions`, `TxStatusResponse`, `FormatAmountOptions`, `TransactionRequest`, `GetBalanceParams`, `GetBalancesParams`, `GetBalancesChainRequest`, `GetBalanceResult`, `ChainBalances`, `TokenBalance`, `ChainGroup`, `NetworkField`, `NetworkId`, `NetworkCategory`, `BasicTokenData`, `BasicTokenSymbol`, `ChainTokenDataMap`, `EvmGeneratedWallet`, `EvmDerivedWallet`, `EntropySource`.
 
 ## Design notes
 
 - The SDK is stateless and transport-agnostic. It expects a caller-provided RPC URL.
+- Multicall3 is used automatically for batched balance queries with per-call failure handling and fallback.
+- Gas estimation applies dynamic congestion-aware buffering (5–30%) based on current fee data.
 - Caching, polling, and background jobs should be handled by the consumer app or backend.
+
+## License
+
+MIT
