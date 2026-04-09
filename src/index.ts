@@ -6,10 +6,8 @@ export { ERC20_TOKEN_CONTRACT_ABI }
 export { GAS_LIMIT_PER_TX_TYPE, MULTICALL3_ADDRESS } from './constants/constants'
 export {
   NetworkField,
-  NETWORKS,
-  NetworkId,
-  NetworkCategory,
-  getNetworksByCategory,
+  NetworkRegistry,
+  NETWORKS_REGISTRY,
 } from './constants/NETWORKS_REGISTRY'
 export {
   BASIC_TOKENS_BY_CHAIN,
