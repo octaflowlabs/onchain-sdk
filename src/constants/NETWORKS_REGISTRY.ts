@@ -36,7 +36,7 @@ export const NETWORKS_REGISTRY: NetworkRegistry[] = [
         nameForDisplay: 'BNB Smart Chain',
         chainId: 56,
         rpcUrl: 'https://bsc-dataseed.bnbchain.org',
-        explorerUrl: 'https://bscscan.com/',
+        explorerUrl: 'https://bscscan.com',
         iconUrl: 'https://assets.coingecko.com/coins/images/825/large/bnb-icon2_2x.png',
         symbol: 'BNB',
         failoverRpcUrl: 'https://bsc.llamarpc.com',
