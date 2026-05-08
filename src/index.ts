@@ -48,7 +48,13 @@ export {
 } from './utils/handleErrorMessages'
 export { normalizeAddress } from './utils/normalizeAddress'
 export { toGwei, tryParseGweiToWei, parseGasLimit } from './utils/parseGasFees'
-export { getFeePresets } from './utils/feePresets'
+export {
+  getFeePresets,
+  calcReserve,
+  estimateSeconds,
+  getBlockTime,
+  BLOCK_TIME_BY_CHAIN,
+} from './utils/feePresets'
 
 /** types exports */
 export {
