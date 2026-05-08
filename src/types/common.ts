@@ -203,3 +203,13 @@ export type FeeHistoryData = {
     maxPriorityFee: string
   }
 }
+
+export type FeeDataInput = {
+  chainId?: number
+  gasLimit?: bigint | string | number
+  feeData?: {
+    maxFeePerGas?: bigint | string
+    maxPriorityFeePerGas?: bigint | string
+    gasPrice?: bigint | string
+  }
+}

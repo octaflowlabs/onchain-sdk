@@ -81,4 +81,5 @@ export {
   LegacyFees,
   FeeModel,
   FeeHistoryData,
+  FeeDataInput,
 } from './types/common'

@@ -1,5 +1,11 @@
 import { NETWORKS_REGISTRY } from '../constants/NETWORKS_REGISTRY'
-import { FeeEstimateSeconds, FeePreset, FeePresetLabel, LegacyFees } from '../types/common'
+import {
+  FeeDataInput,
+  FeeEstimateSeconds,
+  FeePreset,
+  FeePresetLabel,
+  LegacyFees,
+} from '../types/common'
 import { formattedAmountForDisplay } from './formatAmount'
 
 const DEFAULT_BLOCK_TIME = 12
@@ -33,16 +39,6 @@ export function estimateSeconds(
   if (ratio >= 0.9) return { min: blockTime, max: blockTime * 3 }
 
   return { min: blockTime, max: blockTime * 4 }
-}
-
-export type FeeDataInput = {
-  chainId?: number
-  gasLimit?: bigint | string | number
-  feeData?: {
-    maxFeePerGas?: bigint | string
-    maxPriorityFeePerGas?: bigint | string
-    gasPrice?: bigint | string
-  }
 }
 
 export function getFeePresets(tx: FeeDataInput): FeePreset[] {
