@@ -161,3 +161,45 @@ export interface ChainGroup {
   nativeBalanceRequests: GetBalanceParams[]
   tokenBalanceRequests: GetBalanceParams[]
 }
+
+export type EIP1559Fees = {
+  mode: 'eip1559'
+  maxFeePerGas: bigint
+  maxPriorityFeePerGas: bigint
+  gasLimit: bigint
+}
+
+export type LegacyFees = {
+  mode: 'legacy'
+  gasPrice: bigint
+  gasLimit: bigint
+}
+
+export type ResolvedFees = EIP1559Fees | LegacyFees
+
+export type FeeModel = 'eip1559' | 'legacy'
+
+export type FeePresetLabel = 'Low' | 'Standard' | 'High'
+
+export type FeeEstimateSeconds = {
+  min: number
+  max: number
+}
+
+export type FeePreset = {
+  label: FeePresetLabel
+  fees: ResolvedFees
+  humanReadableGasReserve: string
+  humanReadableEstimatedCost: string
+  estimatedSeconds?: FeeEstimateSeconds
+}
+
+export type FeeHistoryData = {
+  currentBaseFee: string // in GWEI, to show in UI
+  range12h: {
+    minBaseFee: string
+    maxBaseFee: string
+    minPriorityFee: string
+    maxPriorityFee: string
+  }
+}

@@ -8,6 +8,7 @@ export interface NetworkField {
   iconUrl: string
   symbol: string
   failoverRpcUrl?: string
+  blockTime?: number
 }
 
 export interface NetworkRegistry {
@@ -29,6 +30,7 @@ export const NETWORKS_REGISTRY: NetworkRegistry[] = [
         iconUrl: 'https://assets.coingecko.com/coins/images/279/large/ethereum.png',
         symbol: 'ETH',
         failoverRpcUrl: 'https://eth.llamarpc.com',
+        blockTime: 12,
       },
       {
         id: 'bnb-smart-chain',
@@ -40,6 +42,7 @@ export const NETWORKS_REGISTRY: NetworkRegistry[] = [
         iconUrl: 'https://assets.coingecko.com/coins/images/825/large/bnb-icon2_2x.png',
         symbol: 'BNB',
         failoverRpcUrl: 'https://bsc.llamarpc.com',
+        blockTime: 3,
       },
       {
         id: 'polygon-mainnet',
@@ -51,6 +54,7 @@ export const NETWORKS_REGISTRY: NetworkRegistry[] = [
         explorerUrl: 'https://polygonscan.com',
         symbol: 'POL',
         failoverRpcUrl: 'https://polygon.llamarpc.com',
+        blockTime: 2,
       },
       {
         id: 'arbitrum-mainnet',
@@ -63,6 +67,7 @@ export const NETWORKS_REGISTRY: NetworkRegistry[] = [
           'https://assets.coingecko.com/coins/images/16547/large/photo_2023-03-29_21.47.00.jpeg',
         symbol: 'ARB',
         failoverRpcUrl: 'https://arb.llamarpc.com',
+        blockTime: 1,
       },
     ],
   },
@@ -79,6 +84,7 @@ export const NETWORKS_REGISTRY: NetworkRegistry[] = [
         iconUrl: 'https://assets.coingecko.com/coins/images/279/large/ethereum.png',
         symbol: 'ETH',
         failoverRpcUrl: 'https://eth-sepolia.llamarpc.com',
+        blockTime: 12,
       },
     ],
   },
