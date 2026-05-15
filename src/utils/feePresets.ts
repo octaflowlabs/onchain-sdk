@@ -54,7 +54,7 @@ export function getFeePresets(tx: FeeDataInput): FeePreset[] {
     const priority = BigInt(maxPriorityFeePerGas)
     const baseFee = BigInt(maxFeePerGas) - BigInt(maxPriorityFeePerGas)
     const estimatedCostPerGas = (priority: bigint) => baseFee + priority
-    const chainId: number = builtTx.unsignedTx?.chainId ?? 1
+    const chainId: number = builtTx.unsignedTx?.chainId ?? builtTx.chainId ?? 1
     const blockTime = getBlockTime(chainId)
 
     const lowPriority = (priority * 75n) / 100n
