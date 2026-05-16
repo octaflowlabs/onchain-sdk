@@ -25,6 +25,11 @@ export { txStatus } from './blockchain/txStatus'
 export { getBalance, getBalances } from './blockchain/getBalances'
 export { estimateTransaction } from './blockchain/estimateTransaction'
 export { prepareTransaction } from './blockchain/prepareTransaction'
+export {
+  fetchFeeSnapshot,
+  type FetchFeeSnapshotOptions,
+  type FeeSnapshotTxKind,
+} from './blockchain/fetchFeeSnapshot'
 
 /** services exports */
 export {
