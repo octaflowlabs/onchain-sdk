@@ -11,6 +11,15 @@ export {
   BasicTokenSymbol,
   ChainTokenDataMap,
 } from './constants/BASIC_TOKENS_REGISTRY'
+export {
+  STABLECOIN_CONTRACTS_BY_CHAIN_ID,
+  getStablecoinContractBySymbolAndChainId,
+  getStablecoinContractsByChainId,
+  isAllowedStablecoinContract,
+  StablecoinContractData,
+  StablecoinContractsByChainId,
+  StablecoinSymbol,
+} from './constants/STABLECOINS_REGISTRY'
 
 /** basic blockchain exports */
 export {
@@ -51,7 +60,7 @@ export {
   errorMessagesForBroadcast,
   errorMessagesForGasLimitEstimation,
 } from './utils/handleErrorMessages'
-export { normalizeAddress } from './utils/normalizeAddress'
+export { normalizeAddress, normalizeEvmAddress } from './utils/normalizeAddress'
 export { toGwei, tryParseGweiToWei, parseGasLimit } from './utils/parseGasFees'
 export {
   getFeePresets,
@@ -60,6 +69,9 @@ export {
   getBlockTime,
   BLOCK_TIME_BY_CHAIN,
 } from './utils/feePresets'
+
+/** webhook exports */
+export { extractPoolInboundStablecoinEvents } from './webhooks/alchemyAddressActivity'
 
 /** types exports */
 export {
