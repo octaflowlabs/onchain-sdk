@@ -4,17 +4,22 @@ export { ERC20_TOKEN_CONTRACT_ABI }
 
 /** constants exports */
 export { GAS_LIMIT_PER_TX_TYPE, MULTICALL3_ADDRESS } from './constants/constants'
-export {
-  NetworkField,
-  NetworkRegistry,
-  NETWORKS_REGISTRY,
-} from './constants/NETWORKS_REGISTRY'
+export { NetworkField, NetworkRegistry, NETWORKS_REGISTRY } from './constants/NETWORKS_REGISTRY'
 export {
   BASIC_TOKENS_BY_CHAIN,
   BasicTokenData,
   BasicTokenSymbol,
   ChainTokenDataMap,
 } from './constants/BASIC_TOKENS_REGISTRY'
+export {
+  STABLECOIN_CONTRACTS_BY_CHAIN_ID,
+  getStablecoinContractBySymbolAndChainId,
+  getStablecoinContractsByChainId,
+  isAllowedStablecoinContract,
+  StablecoinContractData,
+  StablecoinContractsByChainId,
+  StablecoinSymbol,
+} from './constants/STABLECOINS_REGISTRY'
 
 /** basic blockchain exports */
 export {
@@ -29,6 +34,11 @@ export { txStatus } from './blockchain/txStatus'
 export { getBalance, getBalances } from './blockchain/getBalances'
 export { estimateTransaction } from './blockchain/estimateTransaction'
 export { prepareTransaction } from './blockchain/prepareTransaction'
+export {
+  fetchFeeSnapshot,
+  type FetchFeeSnapshotOptions,
+  type FeeSnapshotTxKind,
+} from './blockchain/fetchFeeSnapshot'
 
 /** services exports */
 export {
@@ -50,7 +60,18 @@ export {
   errorMessagesForBroadcast,
   errorMessagesForGasLimitEstimation,
 } from './utils/handleErrorMessages'
-export { normalizeAddress } from './utils/normalizeAddress'
+export { normalizeAddress, normalizeEvmAddress } from './utils/normalizeAddress'
+export { toGwei, tryParseGweiToWei, parseGasLimit } from './utils/parseGasFees'
+export {
+  getFeePresets,
+  calcReserve,
+  estimateSeconds,
+  getBlockTime,
+  BLOCK_TIME_BY_CHAIN,
+} from './utils/feePresets'
+
+/** webhook exports */
+export { extractPoolInboundStablecoinEvents } from './webhooks/alchemyAddressActivity'
 
 /** types exports */
 export {
@@ -75,4 +96,13 @@ export {
   ChainBalances,
   TokenBalance,
   ChainGroup,
+  FeePreset,
+  FeePresetLabel,
+  FeeEstimateSeconds,
+  ResolvedFees,
+  EIP1559Fees,
+  LegacyFees,
+  FeeModel,
+  FeeHistoryData,
+  FeeDataInput,
 } from './types/common'

@@ -72,6 +72,7 @@ import {
 | `formattedAmountForDisplay` | `(amount, decimals, options?) => string` | Locale-aware formatting with group separators, scientific notation for large numbers, and threshold display for tiny amounts. |
 | `parsedAmount` | `(amount: string, decimals: number) => bigint` | Parse a human-readable amount string into its smallest-unit `bigint`. |
 | `normalizeAddress` | `(address: string) => string` | Validate and checksum an Ethereum address. |
+| `normalizeEvmAddress` | `(address: string \| null \| undefined) => string \| null` | Validate, trim, and lowercase an EVM address, returning `null` for empty or invalid values. |
 | `getShortenTransactionHashOrAddress` | `(value, first?, last?) => string` | Shorten a tx hash or address (e.g. `0xAbCd…1234`). |
 | `getShortenData` | `(data, first?, last?) => string` | Shorten arbitrary hex data. |
 | `transformBigInt` | `(obj: ContractTransaction) => object` | Convert all `bigint` properties to strings for JSON serialization. |
@@ -103,11 +104,26 @@ Each `NetworkField` entry includes `id`, `name`, `chainId`, `rpcUrl`, optional `
 |---|---|
 | `BASIC_TOKENS_BY_CHAIN` | Hardcoded ERC-20 token metadata (USDC, USDT, etc.) grouped by chain ID for Ethereum, BSC, Polygon, and Arbitrum. |
 
+### Stablecoin registry
+
+| Export | Description |
+|---|---|
+| `STABLECOIN_CONTRACTS_BY_CHAIN_ID` | Allowlisted USDC, USDT, and OSC test stablecoin contracts grouped by chain ID. |
+| `getStablecoinContractsByChainId` | `(chainId) => readonly StablecoinContractData[]` — return allowlisted stablecoin metadata for one chain. |
+| `getStablecoinContractBySymbolAndChainId` | `(symbol, chainId) => StablecoinContractData \| null` — resolve one allowlisted stablecoin contract by symbol and chain ID. |
+| `isAllowedStablecoinContract` | `(chainId, contractAddress) => boolean` — normalize and check whether a contract is an allowlisted stablecoin on a chain. |
+
+### Alchemy webhooks
+
+| Export | Description |
+|---|---|
+| `extractPoolInboundStablecoinEvents` | `(payload, poolAddress) => PoolInboundStablecoinEvent[]` — extract inbound token transfers to a pool when the token contract is an allowlisted stablecoin. |
+
 ### Types
 
 All interfaces and type aliases are exported for consumer use:
 
-`BroadcastTransactionOptions`, `BuildMaxNativeTransferTxOptions`, `BuildUnsignedTransferTxOptions`, `BuildBaseUnsignedTransferTxParams`, `EstimateGasLimitFromProviderProps`, `GasEstimateResult`, `EstimateTransactionOptions`, `EstimateTransactionResult`, `PrepareTransactionParams`, `PrepareTransactionResult`, `TxStatusOptions`, `TxStatusResponse`, `FormatAmountOptions`, `TransactionRequest`, `GetBalanceParams`, `GetBalancesParams`, `GetBalancesChainRequest`, `GetBalanceResult`, `ChainBalances`, `TokenBalance`, `ChainGroup`, `NetworkField`, `NetworkId`, `NetworkCategory`, `BasicTokenData`, `BasicTokenSymbol`, `ChainTokenDataMap`, `EvmGeneratedWallet`, `EvmDerivedWallet`, `EntropySource`.
+`BroadcastTransactionOptions`, `BuildMaxNativeTransferTxOptions`, `BuildUnsignedTransferTxOptions`, `BuildBaseUnsignedTransferTxParams`, `EstimateGasLimitFromProviderProps`, `GasEstimateResult`, `EstimateTransactionOptions`, `EstimateTransactionResult`, `PrepareTransactionParams`, `PrepareTransactionResult`, `TxStatusOptions`, `TxStatusResponse`, `FormatAmountOptions`, `TransactionRequest`, `GetBalanceParams`, `GetBalancesParams`, `GetBalancesChainRequest`, `GetBalanceResult`, `ChainBalances`, `TokenBalance`, `ChainGroup`, `NetworkField`, `NetworkId`, `NetworkCategory`, `BasicTokenData`, `BasicTokenSymbol`, `ChainTokenDataMap`, `StablecoinContractData`, `StablecoinContractsByChainId`, `StablecoinSymbol`, `EvmGeneratedWallet`, `EvmDerivedWallet`, `EntropySource`.
 
 ## Design notes
 
