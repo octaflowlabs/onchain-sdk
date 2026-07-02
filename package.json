@@ -1,6 +1,6 @@
 {
   "name": "@octaflowlabs/onchain-sdk",
-  "version": "1.4.4",
+  "version": "1.5.1",
   "description": "onchain methods for web3",
   "repository": {
     "type": "git",
