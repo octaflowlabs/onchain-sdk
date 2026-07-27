@@ -39,6 +39,12 @@ export {
   type FetchFeeSnapshotOptions,
   type FeeSnapshotTxKind,
 } from './blockchain/fetchFeeSnapshot'
+export {
+  type GetTokenMetadataParams,
+  type TokenMetadata,
+  getTokenMetadata,
+} from './blockchain/getTokenMetadata'
+export { isVerified } from './blockchain/isTokenVerified'
 
 /** services exports */
 export {
