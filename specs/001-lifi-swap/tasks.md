@@ -70,15 +70,30 @@ Sepolia (11155111) is absent from the swap set; `getSwapSupportedChainIds()` ret
 entries. `review` — `getSwapSupportedChainIds` resolves from the package entry point.
 **Depends on:** —
 
-### T-4 · Native token detection
+### [x] T-4 · Native token detection
 **File:** `src/swap/internal/nativeToken.ts` (new)
 **Satisfies:** SDK-14 · **Plan:** D-6
 
 `isNativeTokenAddress(address)` comparing against the zero address through the existing
-`normalizeEvmAddress`. No symbol comparison anywhere in the file.
+`normalizeEvmAddress`. No symbol comparison anywhere in the file. Internal module: not
+exported from the barrel (D-11).
 
-**Verify** `pure` — zero address true in checksummed, lowercase and mixed case; USDC on
-Polygon false; `null`/`undefined`/`''` false, not a throw.
+D-6's premise was confirmed against `GET https://li.quest/v1/tokens` on 2026-07-29 before
+implementing: the native currency sits at the zero address on every chain sampled — ETH (Base),
+BNB (56), AVAX (43114), xDAI (100), HYPE (999) — and no chain exposes the `0xEeee…` placeholder
+other aggregators use. Four different symbols, one address: the empirical case for D-6.
+
+**Verify** `pure` — 13 cases run against the compiled module: zero address true in lowercase
+and whitespace-padded form; USDC on Base and Polygon false in checksummed, lowercase and
+bad-checksum-uppercase form; the `0xEeee…` placeholder false; `null`/`undefined`/`''`/malformed
+hex/garbage all false; no case throws. **All 13 pass.**
+
+An uppercase `0X` prefix returns `false` rather than `true`: ethers' `getAddress` rejects it,
+so `normalizeEvmAddress` yields `null`. Left as-is deliberately — inputs reach this function
+from LI.FI, which always emits a lowercase `0x`, and diverging here would make this one
+function more permissive than every other address input in the SDK. Both possible wrong answers
+fail loudly rather than silently: a false negative builds an approval to an invalid address, a
+false positive is caught downstream by `INSUFFICIENT_ALLOWANCE` (SDK-21).
 **Depends on:** —
 
 ---
