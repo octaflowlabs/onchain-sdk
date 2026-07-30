@@ -112,3 +112,19 @@ export {
   FeeHistoryData,
   FeeDataInput,
 } from './types/common'
+
+/** swap types exports */
+export {
+  SwapState,
+  SwapPhase,
+  SwapTxOutcome,
+  SwapErrorCode,
+  SwapTokenInfo,
+  SwapRouteSummary,
+  LifiTransactionRequest,
+  SwapQuote,
+  GetSwapQuoteParams,
+  BuildSwapApprovalTxsParams,
+  BuildSwapTxParams,
+  ResolveSwapStateParams,
+} from './types/swap'
