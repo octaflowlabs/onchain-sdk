@@ -100,7 +100,7 @@ false positive is caught downstream by `INSUFFICIENT_ALLOWANCE` (SDK-21).
 
 ## LI.FI access
 
-### T-5 · LI.FI adapter
+### [x] T-5 · LI.FI adapter
 **File:** `src/swap/internal/lifiClient.ts` (new), `package.json`
 **Satisfies:** SDK-4, SDK-5, SDK-6, SDK-33, SDK-38 · **Plan:** D-1, D-10
 
@@ -130,25 +130,55 @@ never `executeRoute` or any execution helper.
   it matches a raw `fetch` rejection.
 - In-memory per-chain cache for `getTokens`, process lifetime only, no persistence (R-1).
 
-**Verify** `pure` — against recorded response fixtures: a response without
-`transactionRequest` yields `NO_ROUTE`; a 404 yields `NO_ROUTE`; a 500 yields `PROVIDER_ERROR`;
-`spender` equals `estimate.approvalAddress` in a fixture where it deliberately differs from
-`transactionRequest.to`; `0.5` reaches `QuoteRequest.slippage` as `0.005`.
-`review` — `@lifi/sdk` is imported in this file and nowhere else; `package.json` pins `3.1.5`
-with no range specifier; `yarn build` still emits both ESM and CJS.
+**Findings, verified against the installed 3.1.5 on 2026-07-30:**
+
+- `createConfig` is genuinely unnecessary, but not for the reason D-1 gave. `request()` *does*
+  guard on `config.get().integrator` — it just never fires, because `config.js` ships a default
+  `integrator: 'lifi-sdk'`. A live `getQuote` with no config call succeeds. The per-request
+  `integrator` field exists on `QuoteRequest` as D-1 predicted and is sent for attribution.
+- Errors arrive as `SDKError` wrapping an `HTTPError` on `.cause`, carrying numeric `.status`
+  and `.responseBody = { message, code }`. Detection is `error.cause.status === 404`, not a
+  `fetch` rejection shape.
+- `transactionRequest.value` and `.gasLimit` arrive as hex strings; `estimate` amounts as
+  decimal strings. `BigInt()` parses both.
+- The adapter returns `Omit<SwapQuote, 'expiresAt'>`. Stamping expiry is T-7's job (SDK-5), and
+  a placeholder here would have been a quote that is either permanently expired or silently
+  valid.
+
+**Verify** `pure` — 9 fixture cases via an injected fake `@lifi/sdk`, all passing: **`spender`
+equals `estimate.approvalAddress` in a fixture where it deliberately differs from
+`transactionRequest.to`**, and `raw.to` still carries the target unmodified; a 200 without
+`transactionRequest` yields `NO_ROUTE`; a missing `approvalAddress` and a malformed amount both
+yield `PROVIDER_ERROR`; `0.5` reaches the wire as `0.005` and `15` as `0.15`; `integrator` is
+sent; `toAddress` defaults to `fromAddress`.
+`chain` — 13 cases against the live API on Base, all passing: happy-path native→USDC returns a
+spender, bigint amounts, `toAmountMin <= toAmount`, converted hex fields, output token metadata;
+a dust amount (HTTP 404) yields `NO_ROUTE`; a deny-listed token (HTTP 400) yields
+`PROVIDER_ERROR`; `fetchTokens` returns 985 tokens for Base and the second call is cache-served.
+`review` — `@lifi/sdk` imported in this file and nowhere else (grep confirms one hit);
+`package.json` pins `"3.1.5"` with no range specifier; `yarn build` emits both ESM and CJS.
 **Depends on:** T-1, T-2
 
-### T-6 · Allowance reader
+### [x] T-6 · Allowance reader
 **File:** `src/swap/internal/allowance.ts` (new)
 **Satisfies:** SDK-13, SDK-21 · **Plan:** D-5
 
 `readAllowance({ rpcUrl, chainId, tokenAddress, owner, spender })` using
 `ERC20_TOKEN_CONTRACT_ABI` and the existing `getProvider`, returning `bigint`. An RPC failure
-raises `SwapError('PROVIDER_ERROR')` rather than returning zero — a silent zero would fabricate
-an approval requirement.
+**and** a `getProvider` returning `undefined`— it does on some `chainId` failures without
+throwing — both raise `SwapError('PROVIDER_ERROR')` rather than returning zero. A silent zero
+would fabricate an approval requirement: a wallet with sufficient allowance would be sent an
+unneeded approval because the read failed, not because the allowance was actually low.
+Internal module: not exported from the barrel (D-11) — only `getSwapQuote` and `buildSwapTx`
+call it directly.
 
-**Verify** `chain` — read a known allowance on Base and compare against an explorer reading.
-`pure` for the failure path with an unreachable RPC URL.
+**Verify** `chain` — on Base, read a real wallet's allowance to a real spender via this
+function, then independently re-derive the same reading with a hand-encoded `eth_call`
+(bypassing this file's `ethers.Contract` usage entirely) and confirm they match — this catches
+an `allowance(owner, spender)` argument-order mistake that a same-library comparison would not.
+Also confirmed the two argument orders produce different calldata, so the ABI call is not
+accidentally symmetric. `pure` — an unreachable RPC URL and a token address that is not a
+contract both raise `SwapError('PROVIDER_ERROR')`, never a silent value.
 **Depends on:** T-2
 
 ---

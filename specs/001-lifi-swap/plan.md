@@ -30,9 +30,14 @@ No API key exists for LI.FI and none is required, and **`createConfig` is not ca
 is to install SDK-level defaults — execution providers, RPC endpoints, api key — none of which
 apply when the `QuoteRequest` is built by hand and no route is ever executed. This matches the
 team's prior production integration, which ran without it. Attribution rides on the request
-object instead: `integrator` is a parameter of `/v1/quote` itself, so it goes on the same
-hand-built object. It carries no secret and is safe in a client bundle. Confirm the exact field
-name against `QuoteRequest` when the package is installed.
+object instead: `integrator` is a field of `QuoteRequest`, confirmed present in the installed
+types. It carries no secret and is safe in a client bundle.
+
+*Confirmed on install (T-5), with one correction:* the package's `request()` helper **does**
+guard on an integrator, throwing a `ValidationError` when it is missing — but it reads
+`config.get().integrator`, and `config.js` ships a default of `'lifi-sdk'`, so the guard never
+fires. Skipping `createConfig` is therefore safe, though not because no guard exists. A live
+`getQuote` with no configuration call was verified to succeed.
 
 **Accepted cost.** The package brings `viem ^2.19.3`, `@solana/web3.js ^1.95.2`,
 `@solana/wallet-adapter-base ^0.9.23`, `@lifi/types` and `eth-rpc-errors` as transitive
