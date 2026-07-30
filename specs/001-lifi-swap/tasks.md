@@ -300,16 +300,23 @@ present either way; a syntactically valid but never-mined hash → `status: "pen
 "pending"`. **9/9 passed.**
 **Depends on:** —
 
-### T-10 · `resolveSwapState`
-**File:** `src/swap/resolveSwapState.ts` (new)
+### [x] T-10 · `resolveSwapState`
+**File:** `src/swap/resolveSwapState.ts` (new), `src/index.ts`
 **Satisfies:** SDK-25, SDK-26, SDK-27, SDK-28, SDK-29, SDK-30, SDK-31, FC-8, FC-9, FC-10
 **Plan:** D-9
 
 Pure function over `{ phase, outcome }` implementing D-9's eight-cell table. No `Date`, no
-provider, no module-level mutable state — SDK-25 makes each of those a defect.
+provider, no module-level mutable state — SDK-25 makes each of those a defect. Exported from
+`src/index.ts` (standing rule, D-11).
 
-**Verify** `pure` — all eight cells against their expected state; `done` is produced by exactly
-one cell (SDK-29, FC-10); calling twice with identical inputs returns identical output.
+**Verify** `pure` — 17 assertions, all passing: all eight `phase × outcome` cells match D-9's
+table exactly (2 phases × 4 outcomes = 8, confirmed exhaustive, not just the rows the table
+happens to list); `done` is produced by exactly one cell (SDK-29, FC-10); `pending` never
+yields `done` or `error` in either phase (SDK-31); `failed` always yields `error` regardless of
+phase (SDK-30); 1000 identical calls return identical output (purity); exactly 5 distinct
+states are reachable across the whole domain (FC-8). SDK-25's "no clock" requirement was
+checked empirically, not by inspection alone: `Date.now` was monkey-patched to throw if
+touched, and the function still resolved correctly, proving it never reads the clock.
 **Depends on:** T-1
 
 ### T-11 · `buildSwapTx`
