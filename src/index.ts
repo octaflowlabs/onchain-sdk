@@ -115,6 +115,7 @@ export {
 
 /** swap exports */
 export { SwapError, isSwapError } from './swap/SwapError'
+export { getSwapSupportedChainIds } from './constants/SWAP_SUPPORTED_CHAINS'
 
 /** swap types exports */
 export {

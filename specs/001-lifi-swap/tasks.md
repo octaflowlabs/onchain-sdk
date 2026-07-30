@@ -54,16 +54,20 @@ ES2020 target, where `instanceof Error` on a subclass needs no prototype workaro
 — both symbols resolve from the package entry point.
 **Depends on:** T-1
 
-### T-3 · Supported chain set
-**File:** `src/constants/SWAP_SUPPORTED_CHAINS.ts` (new)
+### [x] T-3 · Supported chain set
+**File:** `src/constants/SWAP_SUPPORTED_CHAINS.ts` (new), `src/index.ts`
 **Satisfies:** SDK-7, SDK-8, FC-12 · **Plan:** D-2
 
 The 16 verified chain ids as a frozen readonly array, plus `getSwapSupportedChainIds()` and an
 internal `isSwapSupportedChain(chainId)`. Header comment records the verification command
-(`GET /v1/chains?chainTypes=EVM`) and the date it was last run.
+(`GET /v1/chains?chainTypes=EVM`) and the date it was last run. Only `getSwapSupportedChainIds`
+is public surface (D-11); `isSwapSupportedChain` stays unexported from the barrel, for T-7 to
+import directly.
 
-**Verify** `pure` — every id is present in `NETWORKS_REGISTRY`; Sepolia (11155111) is absent;
-`getSwapSupportedChainIds()` returns 16 entries.
+**Verify** `pure` — checked programmatically against the live `NETWORKS_REGISTRY.ts` content,
+not from memory: all 16 ids are present among the registry's active (non-commented) entries;
+Sepolia (11155111) is absent from the swap set; `getSwapSupportedChainIds()` returns 16
+entries. `review` — `getSwapSupportedChainIds` resolves from the package entry point.
 **Depends on:** —
 
 ### T-4 · Native token detection
