@@ -113,6 +113,9 @@ export {
   FeeDataInput,
 } from './types/common'
 
+/** swap exports */
+export { SwapError, isSwapError } from './swap/SwapError'
+
 /** swap types exports */
 export {
   SwapState,

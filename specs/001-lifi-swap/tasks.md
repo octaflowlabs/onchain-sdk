@@ -39,16 +39,19 @@ All twelve types re-exported from `src/index.ts` under a `/** swap types exports
 twelve types resolve from the package entry point.
 **Depends on:** —
 
-### T-2 · `SwapError`
-**File:** `src/swap/SwapError.ts` (new)
+### [x] T-2 · `SwapError`
+**File:** `src/swap/SwapError.ts` (new), `src/index.ts`
 **Satisfies:** SDK-32, FC-11 · **Plan:** D-5
 
 Class extending `Error` with readonly `code` and optional `details`; `name` set to
-`'SwapError'`; exported `isSwapError` type guard that does not rely on `instanceof` alone, so
-it survives a bundle boundary.
+`'SwapError'`; exported `isSwapError` type guard that checks the `code` field, not
+`instanceof` alone, so it survives a bundle boundary where two copies of the class exist.
+`SwapError` and `isSwapError` re-exported from `src/index.ts` (standing rule, D-11).
 
-**Verify** `pure` — a thrown `SwapError` is caught, `isSwapError` returns true, `code` is
-readable, and a plain `Error` returns false.
+**Verify** `pure` — a thrown `SwapError` is caught, `isSwapError` returns true, `code` and
+`name` are readable, a plain `Error` returns false; confirmed at runtime under this repo's
+ES2020 target, where `instanceof Error` on a subclass needs no prototype workaround. `review`
+— both symbols resolve from the package entry point.
 **Depends on:** T-1
 
 ### T-3 · Supported chain set
