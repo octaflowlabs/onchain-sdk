@@ -12,10 +12,13 @@ export const txStatus = async ({
 
   try {
     const receipt = await provider.getTransactionReceipt(txHash)
-    if (!receipt) return { success: false, receipt: null }
-    return { success: receipt.status === 1, receipt }
+    if (!receipt) return { success: false, status: 'pending', receipt: null }
+
+    // Satisfies SDK-24
+    const success = receipt.status === 1
+    return { success, status: success ? 'success' : 'failed', receipt }
   } catch (error: any) {
     console.log('Error checking transaction status:', error)
-    return { success: false, receipt: null }
+    return { success: false, status: 'pending', receipt: null }
   }
 }

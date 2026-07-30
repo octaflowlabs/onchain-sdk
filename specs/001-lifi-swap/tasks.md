@@ -274,7 +274,7 @@ both been broadcast.
 the same live-RPC run above, since only the allowance reader was mocked).
 **Depends on:** T-4, T-6, T-7
 
-### T-9 · Extend `TxStatusResponse`
+### [x] T-9 · Extend `TxStatusResponse`
 **Files:** `src/blockchain/txStatus.ts`, `src/types/common.ts`
 **Satisfies:** SDK-24 · **Plan:** D-8
 
@@ -282,9 +282,22 @@ Add `status: 'pending' | 'success' | 'failed'` alongside the existing `success: 
 semantics do not change. No receipt → `pending`; `receipt.status !== 1` → `failed`; `=== 1` →
 `success`. The existing `catch` branch keeps returning `pending`.
 
-**Verify** `review` — no existing reader of `success` is touched; the field is additive.
-`chain` — a confirmed tx reports `success`, a reverted one reports `failed`, and one polled
-immediately after broadcast reports `pending`.
+Both are shared files predating this feature — `TxStatusResponse`/`txStatus` already served
+transfers before swaps existed. No whole-file traceability header was added (it would
+misrepresent the file's scope); instead a single-line `// Satisfies SDK-24` sits next to the
+status derivation, per CLAUDE.md's clause-traceability exception. No barrel change: both were
+already public before this task: the `status` field is additive to an already-exported type.
+
+**Verify** `review` — grepped the codebase for other readers of `.success`; none exist outside
+this file (the two hits elsewhere are on an unrelated `Multicall3Result` shape). The field is
+purely additive.
+`chain` — against real Base data, not fabricated hashes: pulled a genuinely successful and a
+genuinely reverted transaction out of a live recent block via `getBlock(..., true)` +
+`getTransactionReceipt`, rather than guessing hashes by hand. Confirmed tx → `status:
+"success"`, `success: true`; reverted tx → `status: "failed"`, `success: false`, receipt still
+present either way; a syntactically valid but never-mined hash → `status: "pending"`,
+`receipt: null`; an unreachable RPC host → the `catch` branch still reports `status:
+"pending"`. **9/9 passed.**
 **Depends on:** —
 
 ### T-10 · `resolveSwapState`
