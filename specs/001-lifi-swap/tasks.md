@@ -232,8 +232,8 @@ the same process. And the wire request built by `lifiClient` carries `fromAmount
 was already correct.
 **Depends on:** T-1..T-5
 
-### T-8 · `buildSwapApprovalTxs`
-**File:** `src/swap/buildSwapApprovalTxs.ts` (new)
+### [x] T-8 · `buildSwapApprovalTxs`
+**File:** `src/swap/buildSwapApprovalTxs.ts` (new), `src/index.ts`
 **Satisfies:** SDK-13, SDK-14, SDK-15, SDK-16, SDK-17, SDK-18, FC-4 · **Plan:** D-7
 
 Returns `TransactionRequest[]` of length 0, 1 or 2:
@@ -248,12 +248,30 @@ Returns `TransactionRequest[]` of length 0, 1 or 2:
 Every transaction is addressed to the input token contract (SDK-18) and its spender comes from
 `quote.spender` (SDK-4). **Nonces are read once and assigned sequentially** `n`, `n+1` in list
 order — preparing both in the same tick would otherwise give both the same pending nonce and
-the second would be rejected as a replacement (D-7). Gas via `prepareTransaction` with
-`GAS_LIMIT_PER_TX_TYPE.DEFAULT_APPROVAL` as the floor.
+the second would be rejected as a replacement (D-7). Implemented as: `prepareTransaction` for
+the reset-to-zero transaction (its one internal `getTransactionCount` call is the single nonce
+read), then `estimateTransaction` for the unlimited approval — which does not touch the nonce
+at all — with the transaction assembled by hand using `preparedReset.nonce + 1`. Exported from
+`src/index.ts` (standing rule, D-11).
 
-**Verify** `pure` — the four rows above against a mocked allowance reader, asserting list
-length, ordering, target address, and that the two-element case carries `n` and `n+1`.
-`chain` — the native case and the already-approved case both return `[]` on Base.
+**Verify** `pure` — 15 cases via an injected fake allowance reader (everything else — nonce,
+gas, fee — hits live Base RPC, so the nonce arithmetic is verified against a real reading, not
+a second mock): native input returns `[]` **and never calls the allowance reader at all**
+(SDK-14); allowance equal to or above the amount returns `[]`, with the reader confirmed
+called first (SDK-13, SDK-15); zero allowance returns exactly one transaction, decoded to
+confirm it is `approve(spender, MaxUint256)` addressed to the input token, not the spender
+(SDK-16, SDK-18); an allowance strictly between zero and the amount returns exactly two
+transactions, decoded to confirm `approve(spender, 0)` then `approve(spender, MaxUint256)` in
+that order, **with `nonce[1] === nonce[0] + 1`** against a fresh wallet's real nonce (SDK-17,
+D-7).
+
+**The bug D-7 exists to prevent was reproduced directly**, not just assumed from the writeup:
+calling `prepareTransaction` independently for two transactions in the same tick — the naive
+approach this function deliberately avoids — was run against live Base RPC and returned
+`nonce: 0` for **both**, confirming the second would have been rejected as a replacement had
+both been broadcast.
+`chain` — the native case and the already-approved case both return `[]` on Base (covered by
+the same live-RPC run above, since only the allowance reader was mocked).
 **Depends on:** T-4, T-6, T-7
 
 ### T-9 · Extend `TxStatusResponse`
