@@ -185,8 +185,8 @@ contract both raise `SwapError('PROVIDER_ERROR')`, never a silent value.
 
 ## Public operations
 
-### T-7 · `getSwapQuote`
-**File:** `src/swap/getSwapQuote.ts` (new)
+### [x] T-7 · `getSwapQuote`
+**File:** `src/swap/getSwapQuote.ts` (new), `src/index.ts`
 **Satisfies:** SDK-5, SDK-6, SDK-8, SDK-9, SDK-10, SDK-36, SDK-37, SDK-38 · **Plan:** D-5, D-10
 
 Validation strictly in this order, so nothing costs a round-trip to learn a local input was
@@ -199,12 +199,37 @@ malformed:
 5. fetch the quote; stamp `expiresAt = Date.now() + 30_000` (SDK-5)
 
 Amounts parsed from decimal strings with `parsedAmount` using each token's own decimals
-(SDK-2). The returned quote carries the output token's address and decimals (SDK-5).
+(SDK-2) — `fromToken.decimals` comes out of the same `/tokens` lookup that step 4 performs, so
+that lookup is load-bearing for two reasons, not one. The returned quote carries the output
+token's address and decimals (SDK-5). Exported from `src/index.ts` (standing rule, D-11).
 
-**Verify** `pure` — each of the five branches returns its own code, and steps 1-3 make zero
-network calls (assert against a fixture client that throws if invoked). `chain` — a live
-USDC→USDT quote on Base returns a spender, a `toAmountMin` below `toAmount`, and an
-`expiresAt` 30 s ahead.
+A malformed address (bad checksum) is not a crash: `normalizeEvmAddress` returns `null` for it,
+so it simply never matches an entry in the token list and the request falls through to
+`UNSUPPORTED_TOKEN` — the same place an address for a real but unlisted token lands. Not
+specified by name in spec.md, but a direct consequence of SDK-10's wording ("either token
+cannot be swapped") and confirmed deliberately rather than left as an accident.
+
+**Verify** `pure` — 8 fixture cases via an injected fake `@lifi/sdk`, all passing: slippage
+`0`, `-1`, `15.0001` and `100` each yield `INVALID_SLIPPAGE` with **zero** network calls
+(asserted against a client that throws if invoked at all); the boundary `15` is accepted;
+`fromChainId !== toChainId` and an unsupported chain (including Sepolia specifically) both
+fail locally with zero network calls; a token missing from the chain's list — tried for both
+`fromToken` and `toToken`, on two chains never touched by an earlier case — fails with
+`UNSUPPORTED_TOKEN` and never reaches `getQuote`; the happy path sends `"0.001"` parsed at 18
+decimals as the wire string `"1000000000000000"`, the omitted slippage reaches the wire as the
+fraction `0.005`, and `expiresAt` lands 30 000 ms ± ~1 ms after the call.
+`chain` — a live USDC→USDT quote on Base: `fromAmount` is exactly `5000000n` for input `"5"`
+at USDC's 6 decimals, `toAmountMin < toAmount`, output token metadata reads `USDT`/6, a real
+spender and route come back, `expiresAt` lands 30 s out.
+
+**Two things the fixture runs caught that are worth recording**, both fixed in the test, not
+the implementation: `fetchTokens`'s process-lifetime cache (T-5, R-1) means re-using a chain id
+across fixture cases with different token lists silently serves the first case's cached
+result — the UNSUPPORTED_TOKEN cases had to run on chain ids untouched by any earlier case in
+the same process. And the wire request built by `lifiClient` carries `fromAmount` as a decimal
+**string** and slippage as the field `slippage` (a fraction), not `slippagePercent` as a
+`bigint` — asserting against the wrong shape produced false failures on an implementation that
+was already correct.
 **Depends on:** T-1..T-5
 
 ### T-8 · `buildSwapApprovalTxs`
