@@ -319,8 +319,8 @@ checked empirically, not by inspection alone: `Date.now` was monkey-patched to t
 touched, and the function still resolved correctly, proving it never reads the clock.
 **Depends on:** T-1
 
-### T-11 · `buildSwapTx`
-**File:** `src/swap/buildSwapTx.ts` (new)
+### [x] T-11 · `buildSwapTx`
+**File:** `src/swap/buildSwapTx.ts` (new), `src/index.ts`
 **Satisfies:** SDK-19, SDK-20, SDK-21, SDK-22, SDK-23 · **Plan:** D-3
 
 Ordered gates, cheapest first:
@@ -338,10 +338,40 @@ Returns `PrepareTransactionResult` with `bufferPercentage: 5` and `gasReserve` r
 that limit. `prepareTransaction` is deliberately not used here — its dynamic 5-30% buffer would
 compute a limit we discard, at the cost of a second `estimateGas` (D-3).
 
-**Verify** `pure` — an expired quote yields `QUOTE_EXPIRED` and makes no network call; a mocked
-insufficient allowance yields `INSUFFICIENT_ALLOWANCE`; a mocked `CALL_EXCEPTION` yields
-`EXECUTION_REVERTED` while a mocked timeout yields `PROVIDER_ERROR`; the returned limit equals
-`gasLimit * 1.05`. `chain` — covered by T-15.
+Exported from `src/index.ts` (standing rule, D-11).
+
+**Two gaps in D-3 found while implementing, both resolved in the file with the reasoning
+recorded next to the code:**
+
+- **`INSUFFICIENT_FUNDS` is a distinct ethers code**, neither revert-shaped nor an
+  infrastructure fault, so D-3's two-way split did not cover it. Mapped to
+  `EXECUTION_REVERTED`: reporting it as `PROVIDER_ERROR` would invite the consumer to retry an
+  operation that cannot succeed. Balance remains the consumer's responsibility (FC-14); this is
+  a defensive catch, not a balance check. `UNPREDICTABLE_GAS_LIMIT` is mapped the same way for
+  nodes that still emit it.
+- **`fetchFeeSnapshot` types its fee fields as `bigint | string` and throws a plain `Error`**
+  when the node returns no usable fee data. Left unhandled, that untyped error would escape a
+  swap operation and violate SDK-32. Both are normalized in a local `readFeeData` wrapper —
+  fields to `bigint`, failure to `PROVIDER_ERROR`.
+
+**Verify** `pure` — 18 fixture cases, all passing: an expired quote yields `QUOTE_EXPIRED` with
+**zero** network calls, and `expiresAt === Date.now()` is treated as expired (the `>=`
+boundary); an insufficient allowance yields `INSUFFICIENT_ALLOWANCE` and the simulation never
+runs; a native input skips the allowance read entirely; `CALL_EXCEPTION`, `INSUFFICIENT_FUNDS`
+and `UNPREDICTABLE_GAS_LIMIT` each yield `EXECUTION_REVERTED` while `NETWORK_ERROR`, `TIMEOUT`
+and `SERVER_ERROR` each yield `PROVIDER_ERROR`; `to`/`data`/`value` come from the quote
+(SDK-19); nonce and bigint fee data are resolved (SDK-22); `gasReserve = gasLimit *
+maxFeePerGas`. On sizing: a quote `gasLimit` of `200000n` produces exactly `210000n` and the
+gate's own `150000n` estimate is confirmed **discarded** (the result is not `157500n`), while a
+quote carrying no `gasLimit` falls back to the gate estimate under the same 5% —
+`150000n → 157500n`.
+
+**D-3's central claim was proven against live Base, not assumed.** The same
+guaranteed-to-revert call was put through both paths: `estimateGasLimitFromProvider` swallowed
+it and returned a signable `gasLimit: 100000n` with `fallbackUsed: true`, while `buildSwapTx`
+refused it with `EXECUTION_REVERTED`. That is the transaction a user would otherwise have
+signed and burned the full limit on.
+`chain` — end-to-end swap execution covered by T-15.
 **Depends on:** T-4, T-5, T-6, T-7
 
 ---

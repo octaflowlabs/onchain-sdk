@@ -118,6 +118,7 @@ export { SwapError, isSwapError } from './swap/SwapError'
 export { getSwapSupportedChainIds } from './constants/SWAP_SUPPORTED_CHAINS'
 export { getSwapQuote } from './swap/getSwapQuote'
 export { buildSwapApprovalTxs } from './swap/buildSwapApprovalTxs'
+export { buildSwapTx } from './swap/buildSwapTx'
 export { resolveSwapState } from './swap/resolveSwapState'
 
 /** swap types exports */
