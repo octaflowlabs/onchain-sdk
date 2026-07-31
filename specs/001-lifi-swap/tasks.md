@@ -429,7 +429,7 @@ publish for the *whole* SDK, which is outside this task's declared file scope (`
 only) and outside the plan's scope for 001.
 **Depends on:** T-7..T-11
 
-### T-13 · Key-handling audit
+### [x] T-13 · Key-handling audit
 **Files:** all of `src/swap/`
 **Satisfies:** SDK-3, SDK-34, SDK-35 · **Plan:** D-5
 
@@ -438,11 +438,41 @@ or wallet anywhere in the feature; no call to any signing routine; no new broadc
 (SDK-34); `broadcastTransaction.ts` untouched apart from nothing (SDK-35). Grep for
 `privateKey|mnemonic|signer|Wallet|signTransaction` under `src/swap/` and expect zero hits.
 
-**Verify** `review` — the grep returns nothing, and the four public signatures are inspected
-one by one.
+Audit-only task, like T-12: no source file created or edited, so there is no file to attach a
+traceability header to. Findings recorded here instead.
+
+The literal grep does **not** return empty — `walletAddress` matches `Wallet` as a substring 15
+times, plus two doc-comment sentences using the plain-English word "wallet." Every hit was
+inspected individually: all 15 code hits are the string parameter `walletAddress: string`
+(exactly the shape SDK-3 requires — an address, never a `Wallet` instance or key), and both
+prose hits are ordinary English, not a code reference. **Zero actual violations.**
+
+The four public signatures were read directly rather than inferred from the grep: every
+parameter across `GetSwapQuoteParams`, `BuildSwapApprovalTxsParams`, `BuildSwapTxParams` and
+`ResolveSwapStateParams` is a primitive, a string-union phase/outcome, or the `SwapQuote` data
+object — no `Signer`, `Wallet` or key-shaped type anywhere.
+
+`broadcastTransaction.ts`: `git diff main -- src/blockchain/broadcastTransaction.ts` is empty —
+confirmed untouched, not just assumed (SDK-35). No file under `src/swap/` calls
+`sendTransaction` or any broadcast-shaped method (SDK-34).
+
+**One additional structural check beyond what the task asked for:** every `ethers` `Contract`
+or `Interface` use in `src/swap/` was inspected for what it's actually capable of, not just
+grepped for signing keywords. `buildSwapApprovalTxs.ts`'s `Interface` only encodes calldata —
+no provider or signer attached, so it cannot execute anything. `buildSwapTx.ts`'s
+`provider.estimateGas` is a read-only simulation (`eth_estimateGas`), never
+`sendTransaction`. `allowance.ts`'s `Contract` is bound to a `provider`, not a signer — calling
+a state-changing method on it would throw at runtime, since there is nothing to sign with. This
+is a stronger guarantee than the grep: even a mistaken call to a mutating method would fail
+mechanically, not just violate a convention.
+
+**Verify** `review` — grep hits classified individually (15 `walletAddress` substrings + 2
+prose sentences, zero real matches); all four public signatures read directly; the
+`broadcastTransaction.ts` diff confirmed empty; every `Contract`/`Interface` instance in
+`src/swap/` confirmed incapable of executing a transaction by construction.
 **Depends on:** T-12
 
-### T-14 · Document the public surface
+### [x] T-14 · Document the public surface
 **File:** `README.md`
 **Satisfies:** FC-1 – FC-16 · **Plan:** public surface, consumer flow
 
@@ -456,7 +486,32 @@ consumer cannot infer them from the signatures:
   plain `Error` from `broadcastTransaction`
 - **FC-16** — slippage is a percentage (`0.5` = 0.5%), default 0.5, bounded above 0 and ≤ 15
 
-**Verify** `review` — every documented signature matches the emitted `.d.ts`.
+Like T-12/T-13, no traceability header applies — `README.md` isn't a new source file, so a
+`<!-- Satisfies ... -->` HTML comment sits at the top of the new `### Swaps` section instead
+(invisible when rendered, same intent as the JSDoc headers on every new `swap/` file).
+
+All six signatures and the `SwapQuote` field list were **pulled from the built
+`dist/*.d.ts`**, not copied from plan.md — the plan is a design-time artifact and could have
+drifted from what T-1–T-11 actually shipped. Each was diffed individually: all six function
+signatures match exactly (the README's `(params: XParams) => ...` simplification mirrors the
+convention already used for every other entry, e.g. `getBalance`, which also destructures its
+parameter in source); `SwapQuote`'s 12 fields match in name and order; `SwapErrorCode`'s 9
+codes match in order.
+
+**One gap found and fixed while writing this, not scoped to T-14 but surfaced by it:** the
+existing `txStatus` row didn't mention `TxStatusResponse.status` at all (added in T-9) — so the
+new Swaps section's own claim that "the caller supplies the outcome by polling `txStatus`"
+would have been unverifiable by a reader with no visible source for `outcome`. Fixed both the
+`txStatus` row and the `resolveSwapState` row to state exactly where each `SwapTxOutcome` value
+comes from: `'not-submitted'` is caller-supplied before anything is sent; the other three are
+`TxStatusResponse.status` after polling.
+
+**Verify** `review` — every documented signature matches the emitted `.d.ts`, checked against
+the built output rather than the plan. All five required call-outs are present: FC-15
+(re-quote after `approved`), FC-10 (no balance update before `done`), FC-4 (two-transaction
+approval list, ordered, sequential nonces), FC-11 (two error shapes: `SwapError` vs.
+`broadcastTransaction`'s untyped `Error`), FC-16 (slippage as percentage, default 0.5, bounds
+0 < x ≤ 15).
 **Depends on:** T-12
 
 ### T-15 · On-chain verification run
