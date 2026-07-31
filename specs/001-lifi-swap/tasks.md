@@ -378,7 +378,7 @@ signed and burned the full limit on.
 
 ## Integration
 
-### T-12 · Audit the public export surface
+### [x] T-12 · Audit the public export surface
 **File:** `src/index.ts`
 **Satisfies:** FC-1, FC-11, FC-12, FC-17 · **Plan:** D-4, D-11
 
@@ -398,9 +398,35 @@ Each preceding task already exported its own symbols under the `/** swap exports
 Must **not** be exported: anything under `swap/internal/`, and `isSwapSupportedChain`.
 Exporting `lifiClient` would make `@lifi/sdk` part of the public contract (D-11).
 
-**Verify** `review` — every row above resolves from a bare `import { x } from '../dist'`;
-`grep -r "internal/" src/index.ts` returns nothing; `yarn build` emits a declaration for each
-listed symbol and none for the internals.
+No edits were needed: every task from T-2 onward already added its own exports under the
+standing rule, so this audit is a confirmation, not a batch of fixes.
+
+**Verify** `review` — all 19 expected symbols (6 operations/values + 13 types, per the table
+above) cross-checked one by one against `src/index.ts`: **19/19 present**. `grep -n
+"internal/" src/index.ts`, `grep -n "isSwapSupportedChain" src/index.ts` and `grep -n "export
+\*" src/index.ts` all return nothing. `grep -rln "@lifi/sdk" src/` returns exactly one file
+(`swap/internal/lifiClient.ts`), confirming D-1's isolation held through every later task.
+`yarn build` (full dual build) succeeded; `dist/index.d.ts` was checked for a declaration of
+each of the 19 symbols — **19/19 present** — and contains no reference to `internal` or
+`isSwapSupportedChain`.
+
+Then, rather than trust the grep against source, **imported the built package exactly as a
+consumer would** — `require('dist/cjs/index.js')` from outside the repo tree — and confirmed:
+all 7 public operations/values resolve as functions from the bare entry point; four internal
+symbols one level down the call graph (`isSwapSupportedChain`, `readAllowance`,
+`isNativeTokenAddress`, `fetchQuote`) are `undefined` on the barrel object. **11/11 passed.**
+
+**One structural fact surfaced during the audit, not a defect of this task.** `package.json`
+ships `"files": ["dist"]`, and `tsc` compiles every file under `src/` regardless of whether
+`index.ts` re-exports it — so `dist/swap/internal/*.js` exist as physical files and are
+deep-importable by path (`require('@octaflowlabs/onchain-sdk/dist/swap/internal/lifiClient')`),
+even though nothing in `index.ts` references them. Confirmed this is not new: `dist/services`
+and `dist/webhooks` are equally deep-importable and always have been — a property of how this
+SDK has built and published since before this feature. "Not exported from the public barrel"
+(true, verified above) is a narrower claim than "not present anywhere in the published tree"
+(false, but pre-existing). Closing that gap would mean changing what `tsc`/`package.json`
+publish for the *whole* SDK, which is outside this task's declared file scope (`src/index.ts`
+only) and outside the plan's scope for 001.
 **Depends on:** T-7..T-11
 
 ### T-13 · Key-handling audit
