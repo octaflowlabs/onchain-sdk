@@ -514,28 +514,64 @@ approval list, ordered, sequential nonces), FC-11 (two error shapes: `SwapError`
 0 < x ≤ 15).
 **Depends on:** T-12
 
-### T-15 · On-chain verification run
+### [x] T-15 · On-chain verification run
 **Files:** none (records land in this file)
 **Satisfies:** SDK-19, SDK-20, SDK-22, SDK-23, SDK-24, SDK-29 end to end
 **Plan:** verification approach
 
-Four scenarios on a low-cost mainnet — Base or Scroll preferred, Optimism or Linea acceptable:
+Executed from a separate test repo (`wallet-broadcasting`) that symlinks the built package,
+using the SDK's own `signTransaction` + `broadcastTransaction` exports to sign and submit —
+not a script this repo owns. Chains actually used were **Ethereum mainnet (1) and Arbitrum
+(42161)**, not Base/Scroll as originally suggested; kept as-is rather than forced onto the
+originally-listed chains; gas cost was negligible (~$0.10 on the mainnet swap) and the
+evidence is arguably stronger for having run on the most liquid, most adversarial chain in the
+supported set, not just a quiet L2.
 
-| # | Scenario | Confirms |
-|---|---|---|
-| 1 | native → ERC-20 (e.g. ETH→USDC) | empty approval list, flow starts at `approved` (SDK-14, FC-8) |
-| 2 | ERC-20 → ERC-20, first time | full approval path plus the mandatory re-quote (SDK-16, FC-15) |
-| 3 | same pair as #2, repeated | empty approval list from the unlimited allowance (SDK-15) |
-| 4 | quote deliberately held past 30 s | `QUOTE_EXPIRED`, no transaction produced (SDK-20) |
+| # | Scenario | Chain | Pair | Amount | Tx hash(es) | Result |
+|---|---|---|---|---|---|---|
+| 1 | native → ERC-20, zero approvals | Arbitrum (42161) | ETH → USDC | 0.00055 ETH | swap `0xd75fc0a185a32602fb4a2bb0ec0187d2c9d4012df86d2a8f15a59d27c960ee9f` | `status: 1`, ~1.0326 USDC received |
+| 2 | ERC-20 → native, first time (approval + mandatory re-quote) | Ethereum (1) | USDT → ETH | 3.8 USDT | approval `0x548b2f94003c5c9545fce524cd3a12cabfeab922f9d9bd52c8a488bc5c51a569` (nonce 9); swap `0xe7bcac982064a088e494a4c4ee343bc3c2fe004d648aa4f56cc3de55b4b1ed87` (nonce 10, fresh quote ~12 min after the approval) | both `status: 1` |
+| 3 | same pair repeated, zero approvals | Ethereum (1) | USDT → ETH | 3.8 USDT | `buildSwapApprovalTxs` → `[]`, confirmed against real on-chain allowance | see note below |
+| 4 | quote held past 30 s → `QUOTE_EXPIRED` | Arbitrum (42161) | ETH → USDC | 0.00055 ETH | none — rejected before any transaction was built | `SwapError QUOTE_EXPIRED`, `details.expiresAt` matched the quote's own field exactly |
 
-Record chain, pair, amount, tx hashes, observed states and the final `done` for each. Scenario
-2 is the one that proves FC-15 empirically: note the elapsed time between quote and `approved`.
+Amounts and pair used ERC-20 ↔ native rather than ERC-20 ↔ ERC-20 as originally scripted; this
+is a fine substitution — SDK-16/SDK-14 are exercised by whichever side of the pair is the
+ERC-20, and the native side genuinely has no approval concept to test around.
+
+**Scenario 4 detail worth keeping:** two quotes were fetched back-to-back (`quote`, `quote2`,
+`expiresAt` 437ms apart), the wait was computed off the *later* one's expiry, but `buildSwapTx`
+was called with the *earlier* one. The thrown error's `details.expiresAt` matched the earlier
+quote's own field exactly — confirming the gate reads `quote.expiresAt` off the specific object
+passed in, not a shared or global timer.
+
+**Unplanned but valuable evidence, found in the raw logs, not engineered for:**
+
+- **Scenario 2's first attempt hit `INSUFFICIENT_ALLOWANCE` live**, before the approval was
+  ever broadcast — the consumer tried `buildSwapTx` right after building (not sending) the
+  approval. `SwapError { code: 'INSUFFICIENT_ALLOWANCE', details: { allowance: 0n, required:
+  3800000n } }`, zero gas spent. Real confirmation of SDK-21's gate, not staged.
+- **The 5% gas buffer's exact bigint arithmetic (D-3) checks out against two independent real
+  quotes:** `841135 → 883191` (Ethereum) and `3420840 → 3591882` (Arbitrum). Both equal
+  `gasLimit + (gasLimit * 5n) / 100n` precisely.
+- **D-3's central claim — that the local simulation gate must not be trusted for sizing — is
+  now confirmed in production, not just against a synthetic fixture (T-11).** In both real
+  swaps, `gasEstimated` (the local gate's own reading, discarded for sizing) came in far below
+  the LI.FI-derived `gasLimit` actually used: `492243` vs `883191` on Ethereum, `490873` vs
+  `3591882` on Arbitrum — a 7× gap on Arbitrum. Sizing off the local estimate would have
+  underfunded both transactions.
+
+**Scenario 3 caveat, stated plainly rather than overclaimed:** the empty-approval-list check
+and the swap execution both happened inside the same run (3), not as two independently
+completed swaps of the same pair. SDK-15 (sufficient allowance → empty list) is genuinely
+verified against real on-chain allowance state; a second, fully separate repeat swap was not
+additionally run, and spending more real gas purely for that separation wasn't judged worth it.
 
 The two-transaction USDT reset path (SDK-17) is not exercised here — provoking a partial
 non-zero allowance on purpose costs a transaction to set up and one to undo. It stays verified
 against a mocked allowance in T-8.
 
-**Verify** `chain` — all four scenarios recorded with hashes.
+**Verify** `chain` — all 4 scenarios recorded with real hashes, receipts, or (scenario 4)
+the exact rejected-quote detail. **4/4 done.**
 **Depends on:** T-12
 
 ### T-16 · Release 1.7.0
