@@ -574,7 +574,7 @@ against a mocked allowance in T-8.
 the exact rejected-quote detail. **4/4 done.**
 **Depends on:** T-12
 
-### T-16 · Release 1.7.0
+### [x] T-16 · Release 1.7.0
 **File:** `package.json`
 **Satisfies:** — · **Plan:** target release
 
@@ -582,7 +582,21 @@ Bump `1.6.0` → `1.7.0`. Minor, not patch: the surface grows and `TxStatusRespo
 field (T-9). Run `yarn prettier`, then `yarn build`, and confirm both the ESM and CJS outputs
 plus declarations before publishing.
 
-**Verify** `review` — `dist/index.d.ts` exports the full swap surface; `dist/cjs` builds.
+Published to npm, done by the user manually per their standing preference to run this step
+themselves. Verified against the live registry rather than taken on report: `npm view
+@octaflowlabs/onchain-sdk versions --json` confirms `1.7.0` is present.
+
+**Gap found and closed:** `npm view @octaflowlabs/onchain-sdk dist-tags` initially showed
+`latest: 1.0.0-test6`, `next: 1.7.0` — the `latest` tag had never moved, predating this
+feature (it wasn't even on 1.6.0). Net effect before the fix: `yarn add
+@octaflowlabs/onchain-sdk` or `npm install @octaflowlabs/onchain-sdk` with no version pinned
+would have installed `1.0.0-test6`, not the swap functionality just published. User ran `npm
+dist-tag add @octaflowlabs/onchain-sdk@1.7.0 latest`. Re-checked live: `{ latest: '1.7.0',
+next: '1.7.0' }`.
+
+**Verify** `review` — `dist/index.d.ts` exports the full swap surface; `dist/cjs` builds (both
+confirmed during T-12/T-15). Registry presence of `1.7.0` confirmed live, and `latest`
+dist-tag confirmed pointing at it after the fix.
 **Depends on:** T-13, T-14, T-15
 
 ---
