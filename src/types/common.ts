@@ -103,6 +103,7 @@ export interface TxStatusOptions {
 
 export interface TxStatusResponse {
   success: boolean
+  status: 'pending' | 'success' | 'failed' // Satisfies SDK-24
   receipt: TransactionReceipt | null
 }
 

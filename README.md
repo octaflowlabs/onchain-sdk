@@ -2,7 +2,7 @@
 
 Lightweight TypeScript SDK for EVM onchain utilities. It provides helpers for
 balances, transaction building, broadcasting, gas estimation, wallet derivation,
-and amount formatting.
+amount formatting, and EVM same-chain swaps via LI.FI.
 
 ## Install
 
@@ -47,7 +47,7 @@ import {
 | `estimateTransaction` | `(options: EstimateTransactionOptions) => Promise<EstimateTransactionResult>` | Estimate total transaction cost including gas reserve. |
 | `prepareTransaction` | `(params: PrepareTransactionParams) => Promise<PrepareTransactionResult>` | Full transaction preparation: estimation + nonce + fee data, ready for signing. |
 | `broadcastTransaction` | `(options: BroadcastTransactionOptions) => Promise<string>` | Broadcast a signed transaction and optionally wait for confirmations. Returns the tx hash. |
-| `txStatus` | `(options: TxStatusOptions) => Promise<TxStatusResponse>` | Check transaction status and retrieve the receipt. |
+| `txStatus` | `(options: TxStatusOptions) => Promise<TxStatusResponse>` | Check transaction status and retrieve the receipt. `TxStatusResponse.status` is `'pending' \| 'success' \| 'failed'` — feed it straight into `resolveSwapState`'s `outcome` for a submitted swap or approval transaction. |
 
 ### Provider
 
@@ -119,11 +119,80 @@ Each `NetworkField` entry includes `id`, `name`, `chainId`, `rpcUrl`, optional `
 |---|---|
 | `extractPoolInboundStablecoinEvents` | `(payload, poolAddress) => PoolInboundStablecoinEvent[]` — extract inbound token transfers to a pool when the token contract is an allowlisted stablecoin. |
 
+<!-- Satisfies FC-1, FC-2, FC-3, FC-4, FC-5, FC-6, FC-7, FC-8, FC-9, FC-10, FC-11, FC-12, FC-13, FC-14, FC-15, FC-16 -->
+### Swaps
+
+Same-chain EVM token swaps, quoted and routed through [LI.FI](https://li.fi). The SDK never
+signs or broadcasts a swap transaction — every operation below returns an **unsigned**
+transaction (or a list of them) that the consumer signs and submits through the SDK's existing
+`broadcastTransaction`, exactly as it would for a transfer. Cross-chain requests
+(`fromChainId !== toChainId`) are rejected with `CROSS_CHAIN_NOT_SUPPORTED`; only same-chain
+swaps are in scope today.
+
+| Export | Signature | Description |
+|---|---|---|
+| `getSwapQuote` | `(params: GetSwapQuoteParams) => Promise<SwapQuote>` | Quote a swap. The amount is a decimal string in the input token's own units (e.g. `"1.5"`); the SDK resolves decimals and converts internally. |
+| `buildSwapApprovalTxs` | `(params: BuildSwapApprovalTxsParams) => Promise<TransactionRequest[]>` | Build the ERC-20 approval(s) a swap needs, given a quote. Returns `[]`, `[approve]`, or `[reset, approve]` — see notes below. |
+| `buildSwapTx` | `(params: BuildSwapTxParams) => Promise<PrepareTransactionResult>` | Build the swap transaction itself: gas limit, nonce and fee data are already resolved, ready to sign. |
+| `resolveSwapState` | `(params: ResolveSwapStateParams) => SwapState` | Pure function: given the current phase and a transaction outcome, returns one of `approving \| approved \| swapping \| done \| error`. No network access — before anything is submitted the caller passes `outcome: 'not-submitted'` itself; once submitted, `outcome` is `TxStatusResponse.status` from polling `txStatus`. |
+| `getSwapSupportedChainIds` | `() => number[]` | Chain IDs where swaps are available: the intersection of chains LI.FI supports and chains in `NETWORKS_REGISTRY`. A quote for any other chain fails with `UNSUPPORTED_CHAIN`. |
+| `SwapError` | `class extends Error` | Thrown by every swap operation on an anticipated failure. Carries `code: SwapErrorCode` (the exhaustive branch point) and an optional `details` payload. `message` is developer-facing, not UI copy. |
+| `isSwapError` | `(e: unknown) => e is SwapError` | Type guard for `SwapError`. |
+
+`SwapQuote` is the value the consumer holds between steps and passes back into
+`buildSwapApprovalTxs` and `buildSwapTx`:
+
+```ts
+interface SwapQuote {
+  fromChainId: number
+  toChainId: number
+  fromToken: SwapTokenInfo // { address, decimals, symbol }
+  toToken: SwapTokenInfo
+  fromAmount: bigint
+  toAmount: bigint
+  toAmountMin: bigint // guaranteed by the swap calldata itself
+  slippagePercent: number // e.g. 0.5 means 0.5%
+  spender: string // the address to approve — always this, never the tx `to`
+  expiresAt: number // epoch ms; the quote is 30s old at most
+  route: { tool: string; toolName: string; steps: number }
+  raw: LifiTransactionRequest // opaque; consumed internally by buildSwapTx
+}
+```
+
+`SwapErrorCode` is a closed set: `NO_ROUTE`, `UNSUPPORTED_CHAIN`, `CROSS_CHAIN_NOT_SUPPORTED`,
+`UNSUPPORTED_TOKEN`, `QUOTE_EXPIRED`, `INSUFFICIENT_ALLOWANCE`, `INVALID_SLIPPAGE`,
+`EXECUTION_REVERTED`, `PROVIDER_ERROR`. A consumer can `switch` on it exhaustively.
+
+**Five behaviors that don't show up in the signatures above, and that a consumer needs to know:**
+
+- **A quote does not survive an approval.** Confirming an approval routinely takes longer than
+  the quote's 30-second window. Whenever `buildSwapApprovalTxs` returns a non-empty list, get a
+  **fresh quote** once the approval reaches `approved`, and call `buildSwapTx` with that new
+  quote — not the original one. Re-quoting is safe: approvals are unlimited, so a new quote
+  never invalidates an allowance already granted. A swap that needs no approval can build
+  straight off its original quote.
+- **Never update a balance before `done`.** `resolveSwapState` reaches `done` only from a
+  receipt reporting successful execution. An unreachable node, a missing receipt, or a
+  reverted swap never produce `done` — don't credit or debit anything until it does.
+- **The approval list can hold two transactions.** This happens for tokens (like USDT) that
+  revert an `approve` call if the current allowance is non-zero: `buildSwapApprovalTxs` then
+  returns `[resetToZero, approveMax]`. Broadcast them **in that order**, and wait for the first
+  to confirm before sending the second — they carry sequential nonces on the assumption the
+  first lands before the second is submitted.
+- **A full swap flow surfaces two different error shapes.** `getSwapQuote`,
+  `buildSwapApprovalTxs` and `buildSwapTx` throw `SwapError` (typed, `.code` is exhaustive).
+  Submitting a signed transaction still goes through the existing `broadcastTransaction`,
+  which throws its original, untyped `Error` on failure — that path is unchanged by this
+  feature. Catch both shapes across a full flow.
+- **Slippage is a percentage, not a fraction.** `0.5` means half a percent, not fifty. It's
+  optional, defaults to `0.5`, and must be greater than `0` and at most `15` — anything else
+  throws `INVALID_SLIPPAGE` before any network call.
+
 ### Types
 
 All interfaces and type aliases are exported for consumer use:
 
-`BroadcastTransactionOptions`, `BuildMaxNativeTransferTxOptions`, `BuildUnsignedTransferTxOptions`, `BuildBaseUnsignedTransferTxParams`, `EstimateGasLimitFromProviderProps`, `GasEstimateResult`, `EstimateTransactionOptions`, `EstimateTransactionResult`, `PrepareTransactionParams`, `PrepareTransactionResult`, `TxStatusOptions`, `TxStatusResponse`, `FormatAmountOptions`, `TransactionRequest`, `GetBalanceParams`, `GetBalancesParams`, `GetBalancesChainRequest`, `GetBalanceResult`, `ChainBalances`, `TokenBalance`, `ChainGroup`, `NetworkField`, `NetworkId`, `NetworkCategory`, `BasicTokenData`, `BasicTokenSymbol`, `ChainTokenDataMap`, `StablecoinContractData`, `StablecoinContractsByChainId`, `StablecoinSymbol`, `EvmGeneratedWallet`, `EvmDerivedWallet`, `EntropySource`.
+`BroadcastTransactionOptions`, `BuildMaxNativeTransferTxOptions`, `BuildUnsignedTransferTxOptions`, `BuildBaseUnsignedTransferTxParams`, `EstimateGasLimitFromProviderProps`, `GasEstimateResult`, `EstimateTransactionOptions`, `EstimateTransactionResult`, `PrepareTransactionParams`, `PrepareTransactionResult`, `TxStatusOptions`, `TxStatusResponse`, `FormatAmountOptions`, `TransactionRequest`, `GetBalanceParams`, `GetBalancesParams`, `GetBalancesChainRequest`, `GetBalanceResult`, `ChainBalances`, `TokenBalance`, `ChainGroup`, `NetworkField`, `NetworkId`, `NetworkCategory`, `BasicTokenData`, `BasicTokenSymbol`, `ChainTokenDataMap`, `StablecoinContractData`, `StablecoinContractsByChainId`, `StablecoinSymbol`, `EvmGeneratedWallet`, `EvmDerivedWallet`, `EntropySource`, `SwapState`, `SwapPhase`, `SwapTxOutcome`, `SwapErrorCode`, `SwapTokenInfo`, `SwapRouteSummary`, `LifiTransactionRequest`, `SwapQuote`, `GetSwapQuoteParams`, `BuildSwapApprovalTxsParams`, `BuildSwapTxParams`, `ResolveSwapStateParams`.
 
 ## Design notes
 

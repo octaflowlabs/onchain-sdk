@@ -1,6 +1,6 @@
 {
   "name": "@octaflowlabs/onchain-sdk",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "onchain methods for web3",
   "repository": {
     "type": "git",
@@ -32,6 +32,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@lifi/sdk": "3.1.5",
     "ethers": "^6.16.0"
   }
 }
