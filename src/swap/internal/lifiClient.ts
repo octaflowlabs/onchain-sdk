@@ -1,12 +1,21 @@
 /**
- * LI.FI adapter — spec 001-lifi-swap
+ * LI.FI adapter — spec 001-lifi-swap, spec 002-token-registry
  *
- * Satisfies:
+ * Satisfies (001):
  *  - SDK-4   spender is the address the quote designates for the allowance, never the tx target
  *  - SDK-5   a quote carries amounts, output token metadata, route, spender
  *  - SDK-6   no route for the pair and amount fails with NO_ROUTE
  *  - SDK-33  unreachable or malformed routing-service responses fail with PROVIDER_ERROR
  *  - SDK-38  slippage is a percentage here and a fraction on the wire
+ *
+ * Satisfies (002):
+ *  - TR-1   the routing service's own Token type never crosses into a published type
+ *  - TR-6   isNative is computed from the zero address, never a symbol
+ *  - TR-11  fetchTokensForChains returns every token the routing service lists per chain
+ *  - TR-12  the one getTokens call site takes `chains` and nothing else — no price,
+ *           verification or popularity filter
+ *  - TR-16  a chain already cached is served from memory with no further request
+ *  - TR-19  a logoURI pointing at the dead Zapper bucket is dropped, never published
  *
  * The only module importing `@lifi/sdk` (D-1, D-11). Nothing execution-related is imported:
  * `executeRoute` and every signing path stay unreachable (SDK-3).
@@ -20,6 +29,11 @@
  *  - HTTP 404 is the no-route signal: `"No available quotes for the requested transfer"`.
  *  - `transactionRequest.value` and `.gasLimit` arrive as hex strings, estimate amounts as
  *    decimal strings. `BigInt()` parses both.
+ *
+ * Verified against `GET https://li.quest/v1/tokens` on 2026-08-05 (OQ-4 of spec 002):
+ * `storage.googleapis.com/zapper-fi-assets/...` answers every request with HTTP 403
+ * `UserProjectAccountProblem` — the bucket's billing account is disabled and this will not
+ * recover. It accounted for 44% of Base's logo locations and 74% of Ethereum's.
  */
 
 /** npm imports */
@@ -27,7 +41,8 @@ import { getQuote, getTokens, type QuoteRequest, type Token } from '@lifi/sdk'
 
 /** local imports */
 import { SwapError } from '../SwapError'
-import { LifiTransactionRequest, SwapQuote, SwapTokenInfo } from '../../types/swap'
+import { isNativeTokenAddress } from './nativeToken'
+import { LifiTransactionRequest, SwapQuote, SwapToken, SwapTokenInfo } from '../../types/swap'
 
 const INTEGRATOR = 'octaflow'
 const NOT_FOUND_STATUS = 404
@@ -168,29 +183,63 @@ export const fetchQuote = async ({
 
 const tokensByChain = new Map<number, Token[]>()
 
-export const fetchTokens = async (chainId: number): Promise<Token[]> => {
-  const cached = tokensByChain.get(chainId)
-  if (cached) return cached
+export const fetchTokensForChains = async (
+  chainIds: number[],
+): Promise<Record<number, Token[]>> => {
+  const uniqueChainIds = [...new Set(chainIds)]
+  const missingChainIds = uniqueChainIds.filter((chainId) => !tokensByChain.has(chainId))
 
-  let response
-  try {
-    response = await getTokens({ chains: [chainId] })
-  } catch (error) {
-    throw new SwapError(
-      'PROVIDER_ERROR',
-      upstreamMessageOf(error) ?? 'Could not read the supported token list',
-      error,
-    )
+  if (missingChainIds.length > 0) {
+    let response
+    try {
+      response = await getTokens({ chains: missingChainIds })
+    } catch (error) {
+      throw new SwapError(
+        'PROVIDER_ERROR',
+        upstreamMessageOf(error) ?? 'Could not read the supported token list',
+        error,
+      )
+    }
+
+    const fetchedTokens = missingChainIds.map((chainId) => {
+      const tokens = response?.tokens?.[chainId]
+      if (!Array.isArray(tokens))
+        throw new SwapError(
+          'PROVIDER_ERROR',
+          `Routing service returned no token list for chain ${chainId}`,
+          response,
+        )
+
+      return [chainId, tokens] as const
+    })
+
+    for (const [chainId, tokens] of fetchedTokens) tokensByChain.set(chainId, tokens)
   }
 
-  const tokens = response?.tokens?.[chainId]
-  if (!Array.isArray(tokens))
-    throw new SwapError(
-      'PROVIDER_ERROR',
-      `Routing service returned no token list for chain ${chainId}`,
-      response,
-    )
-
-  tokensByChain.set(chainId, tokens)
-  return tokens
+  const result: Record<number, Token[]> = {}
+  for (const chainId of uniqueChainIds) result[chainId] = tokensByChain.get(chainId) as Token[]
+  return result
 }
+
+export const fetchTokens = async (chainId: number): Promise<Token[]> =>
+  (await fetchTokensForChains([chainId]))[chainId]
+
+const DEAD_LOGO_HOST = 'storage.googleapis.com'
+const DEAD_LOGO_PATH_PREFIX = '/zapper-fi-assets/'
+
+const isDeadLogoURI = (logoURI: string): boolean => {
+  try {
+    const url = new URL(logoURI)
+    return url.host === DEAD_LOGO_HOST && url.pathname.startsWith(DEAD_LOGO_PATH_PREFIX)
+  } catch {
+    return false
+  }
+}
+
+export const toSwapToken = (token: Token): SwapToken => ({
+  ...toTokenInfo(token),
+  chainId: token.chainId,
+  name: token.name,
+  isNative: isNativeTokenAddress(token.address),
+  logoURI: token.logoURI && !isDeadLogoURI(token.logoURI) ? token.logoURI : undefined,
+})

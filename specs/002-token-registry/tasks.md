@@ -42,7 +42,7 @@ does not; `tsc --noEmit` passes. `review` — grep the file for `amount`, `usdVa
 `balance`: zero hits (TR-7 by absence). Both types resolve from the package entry point.
 **Depends on:** —
 
-### [ ] T-2 · Multi-chain reader and the `SwapToken` mapping
+### [x] T-2 · Multi-chain reader and the `SwapToken` mapping
 **File:** `src/swap/internal/lifiClient.ts`
 **Satisfies:** TR-1, TR-6, TR-11, TR-12, TR-16, TR-19 · **Plan:** D-4, D-5
 
