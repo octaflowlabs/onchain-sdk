@@ -27,7 +27,7 @@ contact with 001's swap path is the shared token cache, and T-8 is where that is
 
 ## Foundations
 
-### [ ] T-1 · The published token type
+### [x] T-1 · The published token type
 **File:** `src/types/swap.ts`, `src/index.ts`
 **Satisfies:** TR-1, TR-4, TR-7, TFC-9 · **Plan:** D-2
 

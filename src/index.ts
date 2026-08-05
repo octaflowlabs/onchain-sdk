@@ -135,4 +135,6 @@ export {
   BuildSwapApprovalTxsParams,
   BuildSwapTxParams,
   ResolveSwapStateParams,
+  SwapToken,
+  GetAllSwapTokensParams,
 } from './types/swap'
