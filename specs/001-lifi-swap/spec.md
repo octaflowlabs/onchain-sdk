@@ -216,7 +216,7 @@ navigation.
 
 ## Out of scope
 
-- **Cross-chain swaps and bridging.** Deferred to spec 002. Rejected here by SDK-9.
+- **Cross-chain swaps and bridging.** Deferred to spec 003. Rejected here by SDK-9.
 - **Non-EVM chains.** TRON, Solana and any other non-EVM ecosystem.
 - **Signing and key handling.** Excluded by SDK-3. Broadcasting is *not* excluded: the swap
   flow reuses the SDK's existing generic broadcasting operation (SDK-34).
