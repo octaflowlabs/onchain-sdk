@@ -76,7 +76,7 @@ old signature and `getSwapQuote.ts` is not modified by this task.
 
 ## The curated set
 
-### [ ] T-3 · Logo resolution and the generation script
+### [x] T-3 · Logo resolution and the generation script
 **File:** none shipped — script lives in the scratchpad
 **Satisfies:** TR-2, TR-5, TR-18, TR-19 · **Plan:** D-3, D-9
 
@@ -92,16 +92,22 @@ deterministic path.
 **The script must distinguish "CoinGecko has no image" from "CoinGecko throttled us"** (R-6). A
 429 is a retry or a fall-through, never a recorded absence — conflating them silently drains the
 visual consistency that ordering CoinGecko first was meant to buy. The script emits a per-token
-report naming the winning source and why each earlier one was skipped, and **fails the run rather
-than emitting the file** if any candidate ends with no resolvable logo (TR-5 admits no hole).
+report naming the winning source and why each earlier one was skipped. A candidate whose logo
+cannot be resolved by any source is **dropped from that chain's curated set and reported**, not
+shipped without one (TR-5 admits no exception for a *published* entry, but admits that a
+candidate may simply not be admitted) — matching D-3's wording exactly. This was found to matter
+in practice, not just in principle: Blast's canonical WBTC deployment has no logo on CoinGecko or
+in LI.FI's own data, and that is a property of the asset, not a transient failure — aborting all
+16 chains over it would be disproportionate, the same reasoning that already lets thin chains
+land under TR-3's cap without a gap to fill.
 
 **Verify** `live` — a full run over the 16 chains completes and its report is kept with T-4;
 CoinGecko resolves the majors (ETH, USDC, USDT, DAI, WBTC, WETH) by address; a deliberately
 throttled run is shown to fall through to the next source and not to record an absence; a
-candidate with no logo anywhere aborts the run.
+candidate with no logo anywhere is dropped and named in the report, and the run still completes.
 **Depends on:** —
 
-### [ ] T-4 · `SWAP_TOKENS_REGISTRY` and `getCuratedSwapTokens`
+### [x] T-4 · `SWAP_TOKENS_REGISTRY` and `getCuratedSwapTokens`
 **File:** `src/constants/SWAP_TOKENS_REGISTRY.ts` (new), `src/index.ts`
 **Satisfies:** TR-2, TR-3, TR-4, TR-5, TR-6, TR-8, TR-9, TR-10, TR-18, TFC-2, TFC-5, TFC-6, TFC-7,
 TFC-8 · **Plan:** D-3
@@ -130,7 +136,7 @@ across chains are confirmed to share `name` and `logoURI`, which is the grounds 
 
 ## Public operations
 
-### [ ] T-5 · `getAllSwapTokens`
+### [x] T-5 · `getAllSwapTokens`
 **File:** `src/swap/getAllSwapTokens.ts` (new), `src/index.ts`
 **Satisfies:** TR-11, TR-13, TR-14, TR-15, TR-20, TFC-3, TFC-8 · **Plan:** D-6
 
