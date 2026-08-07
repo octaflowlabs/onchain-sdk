@@ -29,7 +29,7 @@ in this feature to break by accident.
 
 ## Foundations
 
-### [ ] T-1 · Settlement types, and the two closed-set changes
+### [x] T-1 · Settlement types, and the two closed-set changes
 **Files:** `src/types/swap.ts`, `src/index.ts`
 **Satisfies:** CC-28, CC-29, CC-30, CFC-15, CFC-16 · **Plan:** D-6, D-9
 
@@ -43,20 +43,25 @@ In `SwapErrorCode`: remove `'CROSS_CHAIN_NOT_SUPPORTED'` (CC-28), add `'UNSUPPOR
 `/** swap types exports */` block (standing rule).
 
 **Verify** `pure` — `SwapErrorCode` has exactly nine members and the retired code is not among them;
-`SwapSettlementReason` exactly three. **The load-bearing check of D-6 is an assignability one and is
+`SwapSettlementReason` exactly three; both confirmed by an exhaustive `switch` with no `default`,
+compiled with `tsc --strict --noEmit`. **The load-bearing check of D-6 is an assignability one and is
 verified by the compiler, not by reading:** a value typed `SwapSettlementOutcome` is accepted where
-`ResolveSwapStateParams['outcome']` is expected with no cast, and `'not-submitted'` is rejected as a
-`SwapSettlementOutcome`. Both asserted in a scratch file compiled with `tsc --noEmit`, since a plain
-runtime check cannot see either.
-`review` — the four types resolve from the package entry point; `grep -rn "CROSS_CHAIN_NOT_SUPPORTED"
-src/` returns nothing.
+`ResolveSwapStateParams['outcome']` is expected with no cast, and `@ts-expect-error` confirms
+`'not-submitted'` is rejected as a `SwapSettlementOutcome` and `'CROSS_CHAIN_NOT_SUPPORTED'` is
+rejected as a `SwapErrorCode`. All asserted in a scratch file, compiled clean, then deleted — a
+runtime check cannot see any of this.
+`review` — the four types resolve from `src/index.ts`. At the time this task closed, `grep -rn
+"CROSS_CHAIN_NOT_SUPPORTED" src/` still returned the raise site in `getSwapQuote.ts` — expected,
+since removing it is T-3's job, not this one's. With T-3 now also landed, the grep returns exactly
+three hits, all traceability comments (two in this file's header, one in `getSwapQuote.ts`'s), and
+zero code that raises or assigns the retired literal.
 **Depends on:** —
 
 ---
 
 ## LI.FI access
 
-### [ ] T-2 · `fetchSettlement` adapter
+### [x] T-2 · `fetchSettlement` adapter
 **File:** `src/swap/internal/lifiClient.ts`
 **Satisfies:** CC-11, CC-13, CC-14, CC-15, CC-16, CC-17, CC-18, CC-19, CC-21 · **Plan:** D-1, D-2, D-7
 
@@ -75,21 +80,35 @@ to `pending`; the same status maps to `NO_ROUTE` twelve lines away
 pending one. `receivedAmount`/`receivedToken`/`destinationTxHash` stay undefined in those cases and
 are never back-filled from `sending` or from the quote (CC-19).
 
-**Verify** `pure` — an injected fake covering every row of D-2's table; a `receiving`-absent body and
-a `receiving`-pending body each yield a report with the three optional fields undefined and throw
-nothing; `destinationTxHash` is undefined rather than the origin hash when upstream omits it.
-The regression that matters, asserted explicitly: **HTTP 404 yields `pending` and never `NO_ROUTE`.**
-`chain` — the four live probes recorded in D-2 replayed through this function rather than through raw
-`fetch`: unknown hash → `pending`; malformed hash → `failed`/`not-recognized`; a real non-transfer
-hash → `failed`/`not-recognized`; a real completed transfer → `success` carrying the received amount,
-token and destination hash.
+**One row the table doesn't spell out was resolved while implementing, not left implicit:** `status:
+'DONE'` with `receiving` still shaped like `PendingReceivingInfo` (chainId only) is a contradiction
+the upstream type technically allows but the live service never produced. Treated as `success` with
+every optional field undefined rather than thrown — `toSettlementReport`'s `switch` trusts the
+top-level `status` field as authoritative and never inspects `receiving` to *decide* the outcome,
+only to enrich it.
+
+**Verify** `pure` — 15 fixture cases via an `@lifi/sdk` faked by replacing its entry in Node's
+`require.cache` before requiring the compiled adapter (same technique 001's T-5 used), all passing:
+every row of D-2's table, including the two 200-body shapes never observed live (`NOT_FOUND`,
+`INVALID`) and an unrecognised `status` literal falling to `PROVIDER_ERROR` via the `default` branch;
+a `receiving`-absent body (measured `FAILED` shape) and a `receiving`-pending-shaped body on a `DONE`
+status each yield a report with the three optional fields undefined and throw nothing; `fromChain`/
+`toChain` confirmed forwarded to `getStatus` unchanged. The regression that matters, asserted
+explicitly: **HTTP 404 yields `pending` and never `NO_ROUTE`.**
+`chain` — the five live probes from D-2 and D-3 replayed through this function rather than through
+raw `fetch`, all matching: unknown hash → `pending`; malformed hash → `failed`/`not-recognized`; the
+real non-transfer hash → `failed`/`not-recognized`; the real completed same-chain LI.FI swap →
+`success` with `receivedAmount: 1032392n`, `receivedToken` USDC/6, and `destinationTxHash` equal to
+the origin hash (the same-chain artefact D-7 predicted, harmless since this operation is never called
+for a same-chain swap in practice); the real reverted transaction from D-3 → `failed`/`execution-failed`,
+confirming D-3's finding through the actual adapter code path rather than raw `fetch`. **5/5 passed.**
 **Depends on:** T-1
 
 ---
 
 ## Public operations
 
-### [ ] T-3 · `getSwapQuote` accepts differing chains
+### [x] T-3 · `getSwapQuote` accepts differing chains
 **File:** `src/swap/getSwapQuote.ts`
 **Satisfies:** CC-1, CC-2, CC-3, CC-4, CC-6, CC-7, CC-8, CC-28 · **Plan:** D-5
 
@@ -108,19 +127,31 @@ malformed:
 `parsedAmount` keeps using the **origin** token's decimals — that is where the input amount is
 denominated (SDK-2). No barrel change: `getSwapQuote` was already exported.
 
-**Verify** `pure` — via an injected fake: a cross-chain request with a differing `toAddress` yields
-`UNSUPPORTED_RECIPIENT` with **zero** network calls, while the same differing `toAddress` on a
-**same-chain** request still succeeds (CC-2 — this is the assertion that catches the guard being
-written one condition too wide); an unsupported destination chain fails locally with the destination
-id in `details`, and an unsupported origin chain likewise; a token present on the origin chain but
-absent from the destination chain's list yields `UNSUPPORTED_TOKEN` — **the case the old code could
-not detect at all**, since it looked both tokens up in the origin's list; a same-chain request is
-confirmed to perform exactly one token-list lookup, not two (D-5's dedupe claim). 002's
-process-lifetime token cache means each fixture case must use chain ids untouched by earlier cases —
-the trap 001's T-7 recorded and paid for.
+**One fixture bug worth recording, caught before it could hide a real defect:** the first pass at
+the fixtures used non-hex placeholder token addresses (e.g. `'0xfromtoken56'`). `normalizeEvmAddress`
+correctly returns `null` for all of them, which made every comparison `null === null` — spuriously
+matching regardless of which token was actually being looked for, and masking exactly the case (E,
+below) the fixture existed to catch. Fixed by generating syntactically valid 20-byte hex addresses
+programmatically; not a defect in the implementation.
+
+**Verify** `pure` — 12 fixture cases via the same `require.cache`-injected fake `@lifi/sdk` as T-2,
+each case using chain ids untouched by any earlier one in the same process (002's process-lifetime
+token cache, the trap 001's T-7 recorded and paid for): a cross-chain request with a differing
+`toAddress` yields `UNSUPPORTED_RECIPIENT` with **zero** network calls, while the same differing
+`toAddress` on a **same-chain** request still succeeds (CC-2 — the assertion that catches the guard
+being written one condition too wide); an unsupported destination chain fails locally with the
+destination id in `details`, and an unsupported origin chain likewise, both with zero network calls;
+a token present on the origin chain but absent from the destination chain's list yields
+`UNSUPPORTED_TOKEN` — deliberately designed so the *same* token address also exists in the origin's
+registry, reproducing **the exact case the old code could not detect**, since it checked `toToken`
+against the origin's list only and would have wrongly accepted it there; a same-chain request is
+confirmed to perform exactly one `getTokens` call, with a single chain id and not a duplicated pair
+(D-5's dedupe claim). **12/12 passed.**
 `chain` — a live cross-chain quote on the D-4 pair (Polygon USDC → Base USDC): `toToken` carries
-chain 8453 and its own decimals, `toAmountMin` is denominated in the destination token's units
-(CC-7), a real spender comes back, and `expiresAt` lands 30 s out (CC-8).
+Base's own decimals (6), `toAmountMin` (`1992209`) is denominated in the destination token's units
+(CC-7), a real spender comes back, and `expiresAt` landed 30.0–31.6 s out, consistent with network
+latency around the boundary (CC-8). A second live call with `toAddress` explicitly equal to
+`fromAddress` on the same cross-chain pair confirmed CC-6's guard does not reject the identity case.
 **Depends on:** T-1
 
 ### [ ] T-4 · `getSwapSettlement`
