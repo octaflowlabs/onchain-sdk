@@ -181,30 +181,59 @@ exactly as a consumer would; `fetchSettlement` (internal) is `undefined` on that
 nothing — no timer, no loop, no module-scope binding.
 **Depends on:** T-2
 
-### [ ] T-5 · Prove the untouched files are untouched
+### [x] T-5 · Prove the untouched files are untouched
 **Files:** none (audit)
 **Satisfies:** CC-2, CC-9, CC-10, CC-23, CC-24, CFC-1, CFC-7 · **Plan:** D-4
 
 D-4 claims the approval and build paths need no change, and D-3 claims the state machine needs none.
-Both are claims about a **diff**, so they are verified as one.
+Both are claims about a **diff**, so they are verified as one. Audit-only task, like 001's T-12/T-13:
+no source file created or edited, so there is no file to attach a traceability header to. Findings
+recorded here instead.
 
 - `git diff main -- src/swap/buildSwapApprovalTxs.ts src/swap/buildSwapTx.ts
   src/swap/resolveSwapState.ts` is **empty** (CC-9, CC-10, CC-23, CC-24) — the standard 001's T-13
-  applied to `broadcastTransaction.ts`, which stays empty here too (SDK-35).
-- `SwapState` still has exactly five members (CC-24), and `resolveSwapState`'s eight-cell table is
-  unchanged.
-- **FC-13 is verified against the published package, not against this repo's own history:**
-  `npm pack @octaflowlabs/onchain-sdk@1.8.0`, extract its `dist/index.d.ts`, and diff the four 001
-  operation declarations plus `getSwapSupportedChainIds` against the ones this branch emits. They
-  must be **character-identical**. That is what "lifting the restriction will not change any
-  signature" means, and reading the source cannot establish it.
+  applied to `broadcastTransaction.ts`, which stays empty here too (SDK-35). Confirmed with an exit
+  code of `0` and zero output lines, not merely eyeballed.
+- `SwapState` still has exactly five members (CC-24): `types/swap.d.ts`'s diff against 1.8.0, below,
+  touches only `SwapErrorCode` and the new settlement types — the `SwapState` line is untouched, and
+  `resolveSwapState.d.ts`/`.ts` are byte-identical to 1.8.0's, so the eight-cell table stands.
+- **FC-13 verified against the published package, not against this repo's own history:** `main` turned
+  out to be at `1.7.0` — spec 002 was implemented directly on this branch and never merged, so a
+  `git diff main` alone would have proven nothing about `1.8.0`'s actual published surface. `npm view
+  @octaflowlabs/onchain-sdk versions` confirmed `1.8.0` **is** published (under the `next` dist-tag,
+  `latest` still lagging at `1.7.0` — the same gap 001's T-16 found and fixed for that release; out of
+  this task's scope to touch again). `npm pack @octaflowlabs/onchain-sdk@1.8.0`, extracted, and its
+  `dist/index.d.ts` diffed against this branch's freshly built one.
 
-The expected declaration-level diff against 1.8.0 is exactly three things: `SwapErrorCode`'s two
-member changes, the four new settlement types, and `getSwapSettlement`. Anything else in that diff is
-a defect this task exists to catch.
+**Two findings from that diff, both expected, one requiring an extra step to actually prove:**
 
-**Verify** `review` — the three diffs confirmed empty; the `.d.ts` comparison against the published
-1.8.0 tarball recorded member by member.
+- The top-level `index.d.ts` diff is exactly two lines: one new re-export
+  (`getSwapSettlement`) and the swap-types re-export line gaining the four new type names. Nothing
+  else in the 178-file tarball differs — a full `diff -rq` of the two `dist` trees (ESM half) touches
+  exactly six files: `index.d.ts`/`.js`, `getSwapQuote.d.ts`/`.js`, `getSwapSettlement.d.ts`/`.js`
+  (new), `swap/internal/lifiClient.d.ts`/`.js`, and `types/swap.d.ts`/`.js`. No file outside the
+  feature's own footprint moved.
+- **A re-export line being unchanged does not by itself prove a function's signature is unchanged** —
+  `index.d.ts` only names what it re-exports; the actual parameter and return types live in each
+  operation's own `.d.ts`. `getSwapQuote.d.ts` *does* differ from 1.8.0's (T-3 added the 003
+  traceability block to its header comment, which `tsc` carries into the declaration file), so the
+  diff alone could not distinguish "only the comment changed" from "the signature also changed."
+  Isolated the single `export declare const getSwapQuote: (...) => ...;` line in both files and
+  compared it directly: **character-identical.** `buildSwapApprovalTxs.d.ts`, `buildSwapTx.d.ts`,
+  `resolveSwapState.d.ts` and `SWAP_SUPPORTED_CHAINS.d.ts` required no such isolation — each is
+  byte-identical to 1.8.0's in full, comment included, since nothing in this feature touched those
+  five files at all.
+
+The declaration-level diff against 1.8.0 landed exactly on the three things predicted: `SwapErrorCode`
+losing `CROSS_CHAIN_NOT_SUPPORTED` and gaining `UNSUPPORTED_RECIPIENT`, the four new settlement types
+(`SwapSettlementOutcome`, `SwapSettlementReason`, `SwapSettlementReport`, `GetSwapSettlementParams`),
+and `getSwapSettlement` itself. Nothing else.
+
+**Verify** `review` — `git diff main` on the three files confirmed empty by exit code; the full ESM
+`dist` tree diffed file-by-file against the `1.8.0` tarball (6/178 files differ, all within this
+feature's footprint); `getSwapQuote`'s actual signature line isolated and confirmed character-identical
+independent of its changed header comment; the other four FC-13-relevant declaration files confirmed
+byte-identical in full.
 **Depends on:** T-3, T-4
 
 ---
