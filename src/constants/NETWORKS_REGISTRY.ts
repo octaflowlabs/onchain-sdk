@@ -113,7 +113,8 @@ export const NETWORKS_REGISTRY: NetworkRegistry[] = [
         chainId: 999,
         rpcUrl: 'https://rpc.hypurrscan.io',
         explorerUrl: 'https://purrsec.com',
-        iconUrl: 'https://assets.coingecko.com/coins/images/50882/standard/hyperliquid.jpg?1729431300',
+        iconUrl:
+          'https://assets.coingecko.com/coins/images/50882/standard/hyperliquid.jpg?1729431300',
         symbol: 'HYPE',
         failoverRpcUrl: 'https://hyperevm.rpc.sentio.xyz',
         blockTime: 1,
@@ -150,7 +151,8 @@ export const NETWORKS_REGISTRY: NetworkRegistry[] = [
         chainId: 5000,
         rpcUrl: 'https://rpc.mantle.xyz',
         explorerUrl: 'https://mantlescan.xyz',
-        iconUrl: 'https://assets.coingecko.com/coins/images/30980/standard/MNT_Token_Logo.png?1765516974',
+        iconUrl:
+          'https://assets.coingecko.com/coins/images/30980/standard/MNT_Token_Logo.png?1765516974',
         symbol: 'MNT',
         failoverRpcUrl: 'https://mantle.llamarpc.com',
         blockTime: 2,
@@ -198,7 +200,8 @@ export const NETWORKS_REGISTRY: NetworkRegistry[] = [
         chainId: 59144,
         rpcUrl: 'https://rpc.linea.build',
         explorerUrl: 'https://lineascan.build',
-        iconUrl: 'https://assets.coingecko.com/coins/images/68507/standard/linea-logo.jpeg?1756025484',
+        iconUrl:
+          'https://assets.coingecko.com/coins/images/68507/standard/linea-logo.jpeg?1756025484',
         symbol: 'ETH',
         failoverRpcUrl: 'https://linea.llamarpc.com',
         blockTime: 2,

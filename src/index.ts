@@ -10,6 +10,8 @@ export {
   BasicTokenData,
   BasicTokenSymbol,
   ChainTokenDataMap,
+  toLegacyTokenData,
+  LegacyTokenData,
 } from './constants/BASIC_TOKENS_REGISTRY'
 export {
   STABLECOIN_CONTRACTS_BY_CHAIN_ID,
@@ -116,10 +118,13 @@ export {
 /** swap exports */
 export { SwapError, isSwapError } from './swap/SwapError'
 export { getSwapSupportedChainIds } from './constants/SWAP_SUPPORTED_CHAINS'
+export { getCuratedSwapTokens } from './constants/SWAP_TOKENS_REGISTRY'
 export { getSwapQuote } from './swap/getSwapQuote'
 export { buildSwapApprovalTxs } from './swap/buildSwapApprovalTxs'
 export { buildSwapTx } from './swap/buildSwapTx'
 export { resolveSwapState } from './swap/resolveSwapState'
+export { getAllSwapTokens } from './swap/getAllSwapTokens'
+export { getSwapSettlement } from './swap/getSwapSettlement'
 
 /** swap types exports */
 export {
@@ -131,8 +136,14 @@ export {
   SwapRouteSummary,
   LifiTransactionRequest,
   SwapQuote,
+  SwapSettlementOutcome,
+  SwapSettlementReason,
+  SwapSettlementReport,
   GetSwapQuoteParams,
   BuildSwapApprovalTxsParams,
   BuildSwapTxParams,
   ResolveSwapStateParams,
+  SwapToken,
+  GetAllSwapTokensParams,
+  GetSwapSettlementParams,
 } from './types/swap'
