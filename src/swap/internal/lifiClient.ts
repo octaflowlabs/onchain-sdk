@@ -1,5 +1,5 @@
 /**
- * LI.FI adapter — spec 001-lifi-swap, spec 002-token-registry
+ * LI.FI adapter — spec 001-lifi-swap, spec 002-token-registry, spec 003-cross-chain-swap
  *
  * Satisfies (001):
  *  - SDK-4   spender is the address the quote designates for the allowance, never the tx target
@@ -16,6 +16,21 @@
  *           verification or popularity filter
  *  - TR-16  a chain already cached is served from memory with no further request
  *  - TR-19  a logoURI pointing at the dead Zapper bucket is dropped, never published
+ *
+ * Satisfies (003):
+ *  - CC-11  settlement is read from the routing service and reported as pending/success/failed
+ *  - CC-13  in-progress and not-yet-recognised both report pending, indistinguishably
+ *  - CC-14  a complete transfer reports success, whatever it actually delivered
+ *  - CC-15  a refund reports failed with reason refunded
+ *  - CC-16  an upstream-reported failure reports failed with reason execution-failed
+ *  - CC-17  a hash the routing service cannot speak about reports failed with reason
+ *           not-recognized
+ *  - CC-18  a success outcome carries the amount and token actually received, read from
+ *           `receiving`, never restated from the quote
+ *  - CC-19  the destination transaction hash is omitted, never substituted, when upstream
+ *           does not name one
+ *  - CC-21  an unreachable service or a response outside the known status shapes fails with
+ *           PROVIDER_ERROR
  *
  * The only module importing `@lifi/sdk` (D-1, D-11). Nothing execution-related is imported:
  * `executeRoute` and every signing path stay unreachable (SDK-3).
@@ -34,18 +49,47 @@
  * `storage.googleapis.com/zapper-fi-assets/...` answers every request with HTTP 403
  * `UserProjectAccountProblem` — the bucket's billing account is disabled and this will not
  * recover. It accounted for 44% of Base's logo locations and 74% of Ethereum's.
+ *
+ * Verified against `GET https://li.quest/v1/status` on 2026-08-06 (plan D-2, D-3 of spec 003):
+ *  - An unknown or not-yet-indexed hash is an **HTTP 404**, thrown by the package exactly like
+ *    a no-route quote — the same status code `fetchQuote` maps to `NO_ROUTE` twelve lines below.
+ *    That mapping is not reused here: a 404 from `/status` means "not yet indexed", which is
+ *    the ordinary answer for the first seconds of every cross-chain swap.
+ *  - A malformed hash, and a real transaction hash that is not a routing-service transfer, are
+ *    both **HTTP 400** with `{ message, code: 1011 }`.
+ *  - A transaction confirmed reverted on-chain first (`eth_getTransactionReceipt` → `status:
+ *    0x0`) is reported as `{ status: 'FAILED', sending, receiving: absent }` — HTTP 200, not an
+ *    error. `NOT_FOUND` and `INVALID` are declared `StatusMessage` members never observed live;
+ *    handled defensively rather than assumed away.
  */
 
 /** npm imports */
-import { getQuote, getTokens, type QuoteRequest, type Token } from '@lifi/sdk'
+import {
+  getQuote,
+  getStatus,
+  getTokens,
+  type ExtendedTransactionInfo,
+  type GetStatusRequest,
+  type PendingReceivingInfo,
+  type QuoteRequest,
+  type StatusResponse,
+  type Token,
+} from '@lifi/sdk'
 
 /** local imports */
 import { SwapError } from '../SwapError'
 import { isNativeTokenAddress } from './nativeToken'
-import { LifiTransactionRequest, SwapQuote, SwapToken, SwapTokenInfo } from '../../types/swap'
+import {
+  LifiTransactionRequest,
+  SwapQuote,
+  SwapSettlementReport,
+  SwapToken,
+  SwapTokenInfo,
+} from '../../types/swap'
 
 const INTEGRATOR = 'octaflow'
 const NOT_FOUND_STATUS = 404
+const BAD_REQUEST_STATUS = 400
 
 interface FetchQuoteParams {
   fromChainId: number
@@ -243,3 +287,95 @@ export const toSwapToken = (token: Token): SwapToken => ({
   isNative: isNativeTokenAddress(token.address),
   logoURI: token.logoURI && !isDeadLogoURI(token.logoURI) ? token.logoURI : undefined,
 })
+
+interface FetchSettlementParams {
+  txHash: string
+  fromChainId: number
+  toChainId: number
+}
+
+/**
+ * `PendingReceivingInfo` carries only `chainId`; `ExtendedTransactionInfo` additionally
+ * carries `txHash`, so its presence is what discriminates the two (D-7).
+ */
+const isExtendedTransactionInfo = (
+  receiving: PendingReceivingInfo | ExtendedTransactionInfo,
+): receiving is ExtendedTransactionInfo => 'txHash' in receiving
+
+/**
+ * Reads `receiving` defensively: absent on a failed transfer, `PendingReceivingInfo`-shaped
+ * (chainId only) on one still in flight. Every field here stays undefined rather than being
+ * back-filled from `sending` or from the quote (CC-19).
+ */
+const receivedFieldsOf = (
+  receiving: PendingReceivingInfo | ExtendedTransactionInfo,
+): Pick<SwapSettlementReport, 'receivedAmount' | 'receivedToken' | 'destinationTxHash'> => {
+  if (!isExtendedTransactionInfo(receiving)) return {}
+
+  return {
+    receivedAmount: toBigInt(receiving.amount),
+    receivedToken: receiving.token ? toTokenInfo(receiving.token) : undefined,
+    destinationTxHash: receiving.txHash,
+  }
+}
+
+/**
+ * D-2's mapping table, row for row. The switch is exhaustive over `StatusMessage`'s five
+ * declared members; `default` exists for a runtime payload that does not match any of them —
+ * TypeScript cannot rule that out for a value parsed from an HTTP response.
+ */
+const toSettlementReport = (response: StatusResponse): SwapSettlementReport => {
+  switch (response.status) {
+    case 'PENDING':
+    case 'NOT_FOUND':
+      return { outcome: 'pending' }
+
+    case 'DONE':
+      if (response.substatus === 'REFUNDED') return { outcome: 'failed', reason: 'refunded' }
+      return { outcome: 'success', ...receivedFieldsOf(response.receiving) }
+
+    case 'FAILED':
+      return { outcome: 'failed', reason: 'execution-failed' }
+
+    case 'INVALID':
+      return { outcome: 'failed', reason: 'not-recognized' }
+
+    default:
+      throw new SwapError(
+        'PROVIDER_ERROR',
+        'Routing service returned an unrecognised settlement status',
+        response,
+      )
+  }
+}
+
+/**
+ * The 404 branch here is deliberately independent of `fetchQuote`'s (D-2). The same HTTP
+ * status means "no route" on the quote endpoint and "not yet indexed" on this one — sharing
+ * the mapping would report every cross-chain swap as failed in the seconds after broadcast.
+ */
+export const fetchSettlement = async ({
+  txHash,
+  fromChainId,
+  toChainId,
+}: FetchSettlementParams): Promise<SwapSettlementReport> => {
+  const request: GetStatusRequest = { txHash, fromChain: fromChainId, toChain: toChainId }
+
+  let response: StatusResponse
+  try {
+    response = await getStatus(request)
+  } catch (error) {
+    const status = httpStatusOf(error)
+
+    if (status === NOT_FOUND_STATUS) return { outcome: 'pending' }
+    if (status === BAD_REQUEST_STATUS) return { outcome: 'failed', reason: 'not-recognized' }
+
+    throw new SwapError(
+      'PROVIDER_ERROR',
+      upstreamMessageOf(error) ?? 'Could not read settlement from the routing service',
+      error,
+    )
+  }
+
+  return toSettlementReport(response)
+}
