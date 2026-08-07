@@ -124,6 +124,7 @@ export { buildSwapApprovalTxs } from './swap/buildSwapApprovalTxs'
 export { buildSwapTx } from './swap/buildSwapTx'
 export { resolveSwapState } from './swap/resolveSwapState'
 export { getAllSwapTokens } from './swap/getAllSwapTokens'
+export { getSwapSettlement } from './swap/getSwapSettlement'
 
 /** swap types exports */
 export {

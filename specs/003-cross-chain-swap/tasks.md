@@ -154,7 +154,7 @@ latency around the boundary (CC-8). A second live call with `toAddress` explicit
 `fromAddress` on the same cross-chain pair confirmed CC-6's guard does not reject the identity case.
 **Depends on:** T-1
 
-### [ ] T-4 · `getSwapSettlement`
+### [x] T-4 · `getSwapSettlement`
 **File:** `src/swap/getSwapSettlement.ts` (new), `src/index.ts`
 **Satisfies:** CC-11, CC-12, CC-20, CC-22, CC-30 · **Plan:** D-8
 
@@ -166,14 +166,19 @@ supported set would strand a consumer mid-swap.
 No timer, no deadline, no retry, no module-level state (CC-20, CC-22). Exported from `src/index.ts`
 (standing rule).
 
-**Verify** `pure` — the invariant D-6 chose not to encode in the type is asserted here instead:
-`reason` is present exactly when `outcome === 'failed'`, and `receivedAmount`/`receivedToken`
-exactly when `outcome === 'success'`, across every row of D-2's table. A supported-chain pair and an
-**unsupported** one produce the same behaviour, confirming no guard crept in. `Date.now` monkey-
-patched to throw is not touched (CC-20 — no clock means no deadline), the same empirical method 001's
-T-10 used for SDK-25.
-`review` — `getSwapSettlement` resolves from the package entry point; the file contains no
-`setTimeout`, no loop and no module-scope binding.
+**Verify** `pure` — 20 assertions via the same `require.cache`-injected fake `@lifi/sdk` as T-2, all
+passing: the invariant D-6 chose not to encode in the type, asserted here instead — `reason` is
+present exactly when `outcome === 'failed'`, and `receivedAmount`/`receivedToken` are absent on every
+non-`success` outcome, across every row of D-2's table (including the `PROVIDER_ERROR` row, which
+throws rather than returning, as expected); a **supported** chain pair (137/8453) and a nonsense
+**unsupported** one (999999999/888888888) produce byte-identical results for the same upstream
+response, confirming no chain guard crept in; `Date.now` monkey-patched to throw is never invoked
+(CC-20 — no clock means no deadline), the same empirical method 001's T-10 used for SDK-25, and the
+call still resolves correctly with the trap installed.
+`review` — `getSwapSettlement` resolves as a function from `require('dist/cjs/index.js')`, imported
+exactly as a consumer would; `fetchSettlement` (internal) is `undefined` on that same barrel object;
+`grep -nE "setTimeout|setInterval|while\s*\(|for\s*\(|new Map\(|new Set\("` against the file returns
+nothing — no timer, no loop, no module-scope binding.
 **Depends on:** T-2
 
 ### [ ] T-5 · Prove the untouched files are untouched
