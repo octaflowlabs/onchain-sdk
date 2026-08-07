@@ -31,95 +31,96 @@ import {
 
 ### Balances
 
-| Export | Signature | Description |
-|---|---|---|
-| `getBalance` | `(params: GetBalanceParams) => Promise<bigint \| undefined>` | Fetch native or ERC-20 balance for a single token on one chain. |
-| `getBalances` | `(params: GetBalancesParams) => Promise<GetBalanceResult>` | Batch-fetch balances across multiple chains using Multicall3 aggregation with automatic fallback to individual calls. |
+| Export        | Signature                                                    | Description                                                                                                           |
+| ------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `getBalance`  | `(params: GetBalanceParams) => Promise<bigint \| undefined>` | Fetch native or ERC-20 balance for a single token on one chain.                                                       |
+| `getBalances` | `(params: GetBalancesParams) => Promise<GetBalanceResult>`   | Batch-fetch balances across multiple chains using Multicall3 aggregation with automatic fallback to individual calls. |
 
 ### Transactions
 
-| Export | Signature | Description |
-|---|---|---|
-| `buildBaseUnsignedTransferTx` | `(params: BuildBaseUnsignedTransferTxParams) => { to, data, value }` | Build the core `to`/`data`/`value` fields for a native or ERC-20 transfer. |
-| `buildUnsignedTransferTx` | `(options: BuildUnsignedTransferTxOptions) => Promise<PrepareTransactionResult>` | Build a complete unsigned transfer transaction with gas estimation. |
-| `buildMaxNativeTransferTx` | `(options: BuildMaxNativeTransferTxOptions) => Promise<string>` | Calculate the maximum sendable native amount after reserving gas. |
-| `estimateGasLimitFromProvider` | `(props: EstimateGasLimitFromProviderProps) => Promise<GasEstimateResult>` | Estimate gas limit with dynamic congestion-based buffering (5–30%). |
-| `estimateTransaction` | `(options: EstimateTransactionOptions) => Promise<EstimateTransactionResult>` | Estimate total transaction cost including gas reserve. |
-| `prepareTransaction` | `(params: PrepareTransactionParams) => Promise<PrepareTransactionResult>` | Full transaction preparation: estimation + nonce + fee data, ready for signing. |
-| `broadcastTransaction` | `(options: BroadcastTransactionOptions) => Promise<string>` | Broadcast a signed transaction and optionally wait for confirmations. Returns the tx hash. |
-| `txStatus` | `(options: TxStatusOptions) => Promise<TxStatusResponse>` | Check transaction status and retrieve the receipt. `TxStatusResponse.status` is `'pending' \| 'success' \| 'failed'` — feed it straight into `resolveSwapState`'s `outcome` for a submitted swap or approval transaction. |
+| Export                         | Signature                                                                        | Description                                                                                                                                                                                                               |
+| ------------------------------ | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `buildBaseUnsignedTransferTx`  | `(params: BuildBaseUnsignedTransferTxParams) => { to, data, value }`             | Build the core `to`/`data`/`value` fields for a native or ERC-20 transfer.                                                                                                                                                |
+| `buildUnsignedTransferTx`      | `(options: BuildUnsignedTransferTxOptions) => Promise<PrepareTransactionResult>` | Build a complete unsigned transfer transaction with gas estimation.                                                                                                                                                       |
+| `buildMaxNativeTransferTx`     | `(options: BuildMaxNativeTransferTxOptions) => Promise<string>`                  | Calculate the maximum sendable native amount after reserving gas.                                                                                                                                                         |
+| `estimateGasLimitFromProvider` | `(props: EstimateGasLimitFromProviderProps) => Promise<GasEstimateResult>`       | Estimate gas limit with dynamic congestion-based buffering (5–30%).                                                                                                                                                       |
+| `estimateTransaction`          | `(options: EstimateTransactionOptions) => Promise<EstimateTransactionResult>`    | Estimate total transaction cost including gas reserve.                                                                                                                                                                    |
+| `prepareTransaction`           | `(params: PrepareTransactionParams) => Promise<PrepareTransactionResult>`        | Full transaction preparation: estimation + nonce + fee data, ready for signing.                                                                                                                                           |
+| `broadcastTransaction`         | `(options: BroadcastTransactionOptions) => Promise<string>`                      | Broadcast a signed transaction and optionally wait for confirmations. Returns the tx hash.                                                                                                                                |
+| `txStatus`                     | `(options: TxStatusOptions) => Promise<TxStatusResponse>`                        | Check transaction status and retrieve the receipt. `TxStatusResponse.status` is `'pending' \| 'success' \| 'failed'` — feed it straight into `resolveSwapState`'s `outcome` for a submitted swap or approval transaction. |
 
 ### Provider
 
-| Export | Signature | Description |
-|---|---|---|
-| `getProvider` | `(rpcUrl: string, chainId?: number) => JsonRpcProvider \| undefined` | Create an ethers `JsonRpcProvider` with optional static network. |
-| `getDefaultRpc` | `(networkId: NetworkId) => string` | Return the default RPC URL for a registered network. |
+| Export          | Signature                                                            | Description                                                      |
+| --------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `getProvider`   | `(rpcUrl: string, chainId?: number) => JsonRpcProvider \| undefined` | Create an ethers `JsonRpcProvider` with optional static network. |
+| `getDefaultRpc` | `(networkId: NetworkId) => string`                                   | Return the default RPC URL for a registered network.             |
 
 ### Wallet and signing
 
-| Export | Signature | Description |
-|---|---|---|
-| `EvmWalletService` | `class` | HD wallet service: generate wallets, derive from mnemonic or private key, find next available index, sign messages, validate mnemonics. Accepts an `EntropySource` for randomness. |
-| `createWallet` | `(privateKey: string, rpcUrl?: string) => Wallet` | Create an ethers `Wallet` instance from a private key. |
-| `signMessage` | `(privateKey: string, message: string) => Promise<string>` | Sign an arbitrary message. |
-| `signTransaction` | `(privateKey: string, tx: TransactionRequest, rpcUrl?: string) => Promise<string>` | Sign a transaction and return the serialized signed payload. |
+| Export             | Signature                                                                          | Description                                                                                                                                                                        |
+| ------------------ | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EvmWalletService` | `class`                                                                            | HD wallet service: generate wallets, derive from mnemonic or private key, find next available index, sign messages, validate mnemonics. Accepts an `EntropySource` for randomness. |
+| `createWallet`     | `(privateKey: string, rpcUrl?: string) => Wallet`                                  | Create an ethers `Wallet` instance from a private key.                                                                                                                             |
+| `signMessage`      | `(privateKey: string, message: string) => Promise<string>`                         | Sign an arbitrary message.                                                                                                                                                         |
+| `signTransaction`  | `(privateKey: string, tx: TransactionRequest, rpcUrl?: string) => Promise<string>` | Sign a transaction and return the serialized signed payload.                                                                                                                       |
 
 ### Utilities
 
-| Export | Signature | Description |
-|---|---|---|
-| `formattedAmountForDisplay` | `(amount, decimals, options?) => string` | Locale-aware formatting with group separators, scientific notation for large numbers, and threshold display for tiny amounts. |
-| `parsedAmount` | `(amount: string, decimals: number) => bigint` | Parse a human-readable amount string into its smallest-unit `bigint`. |
-| `normalizeAddress` | `(address: string) => string` | Validate and checksum an Ethereum address. |
-| `normalizeEvmAddress` | `(address: string \| null \| undefined) => string \| null` | Validate, trim, and lowercase an EVM address, returning `null` for empty or invalid values. |
-| `getShortenTransactionHashOrAddress` | `(value, first?, last?) => string` | Shorten a tx hash or address (e.g. `0xAbCd…1234`). |
-| `getShortenData` | `(data, first?, last?) => string` | Shorten arbitrary hex data. |
-| `transformBigInt` | `(obj: ContractTransaction) => object` | Convert all `bigint` properties to strings for JSON serialization. |
-| `handleErrorMessages` | `(options: { e, message }) => void` | Log structured ethers errors with detailed context. |
+| Export                               | Signature                                                  | Description                                                                                                                   |
+| ------------------------------------ | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `formattedAmountForDisplay`          | `(amount, decimals, options?) => string`                   | Locale-aware formatting with group separators, scientific notation for large numbers, and threshold display for tiny amounts. |
+| `parsedAmount`                       | `(amount: string, decimals: number) => bigint`             | Parse a human-readable amount string into its smallest-unit `bigint`.                                                         |
+| `normalizeAddress`                   | `(address: string) => string`                              | Validate and checksum an Ethereum address.                                                                                    |
+| `normalizeEvmAddress`                | `(address: string \| null \| undefined) => string \| null` | Validate, trim, and lowercase an EVM address, returning `null` for empty or invalid values.                                   |
+| `getShortenTransactionHashOrAddress` | `(value, first?, last?) => string`                         | Shorten a tx hash or address (e.g. `0xAbCd…1234`).                                                                            |
+| `getShortenData`                     | `(data, first?, last?) => string`                          | Shorten arbitrary hex data.                                                                                                   |
+| `transformBigInt`                    | `(obj: ContractTransaction) => object`                     | Convert all `bigint` properties to strings for JSON serialization.                                                            |
+| `handleErrorMessages`                | `(options: { e, message }) => void`                        | Log structured ethers errors with detailed context.                                                                           |
 
 ### Constants
 
-| Export | Description |
-|---|---|
-| `GAS_LIMIT_PER_TX_TYPE` | Default gas limits: native transfer (`21 000n`), ERC-20 transfer (`65 000n`), approval (`100 000n`). |
-| `MULTICALL3_ADDRESS` | Canonical Multicall3 contract address. |
-| `ERC20_TOKEN_CONTRACT_ABI` | Standard ERC-20 ABI (`balanceOf`, `transfer`, `approve`, `allowance`, `decimals`, etc.). |
-| `NATIVE_TOKENS` | Native token metadata by chain (ETH, BNB, POL). |
+| Export                     | Description                                                                                          |
+| -------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `GAS_LIMIT_PER_TX_TYPE`    | Default gas limits: native transfer (`21 000n`), ERC-20 transfer (`65 000n`), approval (`100 000n`). |
+| `MULTICALL3_ADDRESS`       | Canonical Multicall3 contract address.                                                               |
+| `ERC20_TOKEN_CONTRACT_ABI` | Standard ERC-20 ABI (`balanceOf`, `transfer`, `approve`, `allowance`, `decimals`, etc.).             |
+| `NATIVE_TOKENS`            | Native token metadata by chain (ETH, BNB, POL).                                                      |
 
 ### Networks registry
 
 The SDK ships a built-in networks registry (`NETWORKS`) covering Ethereum, BSC, Polygon, Arbitrum, and Sepolia.
 
-| Export | Description |
-|---|---|
-| `NETWORKS` | `Record<NetworkId, NetworkField>` — full network config map. |
+| Export                  | Description                                                                                    |
+| ----------------------- | ---------------------------------------------------------------------------------------------- |
+| `NETWORKS`              | `Record<NetworkId, NetworkField>` — full network config map.                                   |
 | `getNetworksByCategory` | `(category: NetworkCategory) => NetworkField[]` — filter by `popular`, `custom`, or `testnet`. |
 
 Each `NetworkField` entry includes `id`, `name`, `chainId`, `rpcUrl`, optional `failoverRpcUrl`, `explorerUrl`, `iconUrl`, and `symbol`.
 
 ### Tokens registry
 
-| Export | Description |
-|---|---|
+| Export                  | Description                                                                                                      |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `BASIC_TOKENS_BY_CHAIN` | Hardcoded ERC-20 token metadata (USDC, USDT, etc.) grouped by chain ID for Ethereum, BSC, Polygon, and Arbitrum. |
 
 ### Stablecoin registry
 
-| Export | Description |
-|---|---|
-| `STABLECOIN_CONTRACTS_BY_CHAIN_ID` | Allowlisted USDC, USDT, and OSC test stablecoin contracts grouped by chain ID. |
-| `getStablecoinContractsByChainId` | `(chainId) => readonly StablecoinContractData[]` — return allowlisted stablecoin metadata for one chain. |
+| Export                                    | Description                                                                                                                 |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `STABLECOIN_CONTRACTS_BY_CHAIN_ID`        | Allowlisted USDC, USDT, and OSC test stablecoin contracts grouped by chain ID.                                              |
+| `getStablecoinContractsByChainId`         | `(chainId) => readonly StablecoinContractData[]` — return allowlisted stablecoin metadata for one chain.                    |
 | `getStablecoinContractBySymbolAndChainId` | `(symbol, chainId) => StablecoinContractData \| null` — resolve one allowlisted stablecoin contract by symbol and chain ID. |
-| `isAllowedStablecoinContract` | `(chainId, contractAddress) => boolean` — normalize and check whether a contract is an allowlisted stablecoin on a chain. |
+| `isAllowedStablecoinContract`             | `(chainId, contractAddress) => boolean` — normalize and check whether a contract is an allowlisted stablecoin on a chain.   |
 
 ### Alchemy webhooks
 
-| Export | Description |
-|---|---|
+| Export                               | Description                                                                                                                                                |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `extractPoolInboundStablecoinEvents` | `(payload, poolAddress) => PoolInboundStablecoinEvent[]` — extract inbound token transfers to a pool when the token contract is an allowlisted stablecoin. |
 
 <!-- Satisfies FC-1, FC-2, FC-3, FC-4, FC-5, FC-6, FC-7, FC-8, FC-9, FC-10, FC-11, FC-12, FC-13, FC-14, FC-15, FC-16 -->
+
 ### Swaps
 
 Same-chain EVM token swaps, quoted and routed through [LI.FI](https://li.fi). The SDK never
@@ -129,15 +130,15 @@ transaction (or a list of them) that the consumer signs and submits through the 
 (`fromChainId !== toChainId`) are rejected with `CROSS_CHAIN_NOT_SUPPORTED`; only same-chain
 swaps are in scope today.
 
-| Export | Signature | Description |
-|---|---|---|
-| `getSwapQuote` | `(params: GetSwapQuoteParams) => Promise<SwapQuote>` | Quote a swap. The amount is a decimal string in the input token's own units (e.g. `"1.5"`); the SDK resolves decimals and converts internally. |
-| `buildSwapApprovalTxs` | `(params: BuildSwapApprovalTxsParams) => Promise<TransactionRequest[]>` | Build the ERC-20 approval(s) a swap needs, given a quote. Returns `[]`, `[approve]`, or `[reset, approve]` — see notes below. |
-| `buildSwapTx` | `(params: BuildSwapTxParams) => Promise<PrepareTransactionResult>` | Build the swap transaction itself: gas limit, nonce and fee data are already resolved, ready to sign. |
-| `resolveSwapState` | `(params: ResolveSwapStateParams) => SwapState` | Pure function: given the current phase and a transaction outcome, returns one of `approving \| approved \| swapping \| done \| error`. No network access — before anything is submitted the caller passes `outcome: 'not-submitted'` itself; once submitted, `outcome` is `TxStatusResponse.status` from polling `txStatus`. |
-| `getSwapSupportedChainIds` | `() => number[]` | Chain IDs where swaps are available: the intersection of chains LI.FI supports and chains in `NETWORKS_REGISTRY`. A quote for any other chain fails with `UNSUPPORTED_CHAIN`. |
-| `SwapError` | `class extends Error` | Thrown by every swap operation on an anticipated failure. Carries `code: SwapErrorCode` (the exhaustive branch point) and an optional `details` payload. `message` is developer-facing, not UI copy. |
-| `isSwapError` | `(e: unknown) => e is SwapError` | Type guard for `SwapError`. |
+| Export                     | Signature                                                               | Description                                                                                                                                                                                                                                                                                                                  |
+| -------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `getSwapQuote`             | `(params: GetSwapQuoteParams) => Promise<SwapQuote>`                    | Quote a swap. The amount is a decimal string in the input token's own units (e.g. `"1.5"`); the SDK resolves decimals and converts internally.                                                                                                                                                                               |
+| `buildSwapApprovalTxs`     | `(params: BuildSwapApprovalTxsParams) => Promise<TransactionRequest[]>` | Build the ERC-20 approval(s) a swap needs, given a quote. Returns `[]`, `[approve]`, or `[reset, approve]` — see notes below.                                                                                                                                                                                                |
+| `buildSwapTx`              | `(params: BuildSwapTxParams) => Promise<PrepareTransactionResult>`      | Build the swap transaction itself: gas limit, nonce and fee data are already resolved, ready to sign.                                                                                                                                                                                                                        |
+| `resolveSwapState`         | `(params: ResolveSwapStateParams) => SwapState`                         | Pure function: given the current phase and a transaction outcome, returns one of `approving \| approved \| swapping \| done \| error`. No network access — before anything is submitted the caller passes `outcome: 'not-submitted'` itself; once submitted, `outcome` is `TxStatusResponse.status` from polling `txStatus`. |
+| `getSwapSupportedChainIds` | `() => number[]`                                                        | Chain IDs where swaps are available: the intersection of chains LI.FI supports and chains in `NETWORKS_REGISTRY`. A quote for any other chain fails with `UNSUPPORTED_CHAIN`.                                                                                                                                                |
+| `SwapError`                | `class extends Error`                                                   | Thrown by every swap operation on an anticipated failure. Carries `code: SwapErrorCode` (the exhaustive branch point) and an optional `details` payload. `message` is developer-facing, not UI copy.                                                                                                                         |
+| `isSwapError`              | `(e: unknown) => e is SwapError`                                        | Type guard for `SwapError`.                                                                                                                                                                                                                                                                                                  |
 
 `SwapQuote` is the value the consumer holds between steps and passes back into
 `buildSwapApprovalTxs` and `buildSwapTx`:
@@ -188,11 +189,65 @@ interface SwapQuote {
   optional, defaults to `0.5`, and must be greater than `0` and at most `15` — anything else
   throws `INVALID_SLIPPAGE` before any network call.
 
+<!-- Satisfies TR-1 .. TR-23, TFC-1 .. TFC-13 (spec 002-token-registry) -->
+
+#### Swap tokens
+
+Two published token lists, for the assets a selector offers rather than the swap itself: a small
+**curated** set per chain (native currency, its wrapped equivalent, recognised stablecoins, and a
+few majors with an established market — at most 20 entries), and the **full** set the router
+supports on that chain, unfiltered. Both are expressed in the SDK's own `SwapToken` type — never
+the router's own token shape.
+
+| Export                 | Signature                                                                  | Description                                                                                                                                                                                                                                                                                                     |
+| ---------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `getCuratedSwapTokens` | `(chainId: number) => SwapToken[]`                                         | Synchronous, no network access, cannot fail. An unsupported chain returns `[]`. Ordered: native currency first, then stablecoins, then the rest — stable across calls.                                                                                                                                          |
+| `getAllSwapTokens`     | `(params: GetAllSwapTokensParams) => Promise<Record<number, SwapToken[]>>` | Every token the router lists for one or more chains, keyed by chain ID. An unsupported chain throws `UNSUPPORTED_CHAIN` before any network call; an upstream failure throws `PROVIDER_ERROR` for the whole call — never a partial result. No ordering is guaranteed. Cached per chain for the process lifetime. |
+| `toLegacyTokenData`    | `(tokens: SwapToken[]) => LegacyTokenData[]` **(deprecated)**              | Converts published tokens into the shape `BASIC_TOKENS_BY_CHAIN` already uses, for consumers migrating incrementally. Deprecated from introduction — new code should use `SwapToken` directly.                                                                                                                  |
+
+```ts
+interface SwapToken {
+  chainId: number
+  address: string
+  decimals: number
+  symbol: string
+  name: string
+  isNative: boolean
+  logoURI?: string // present on every curated entry; absent, not broken, on most of the full set
+}
+```
+
+**Six behaviors that don't show up in the signatures above, and that a consumer needs to know:**
+
+- **Neither list is a promise that a swap exists.** A curated or full-set token can still yield
+  `UNSUPPORTED_TOKEN` or `NO_ROUTE` from `getSwapQuote` — curation is best-effort, dated at
+  authoring time, and the router's own list moves independently. Handle both codes regardless of
+  which list a token came from.
+- **Most of the full set has no logo.** Measured coverage: 28% on Base, 11% on Ethereum. A
+  missing `logoURI` means exactly that — no logo — never "a logo that failed to load"; one
+  placeholder path covers every case. Every curated entry carries a working one.
+- **The curated set only changes with a package release.** The full set is fetched once per
+  chain per process and served from memory after that — a long-lived tab will not see a token
+  added upstream until it reloads.
+- **`BASIC_TOKENS_BY_CHAIN` still works, unchanged, and is deprecated.** `toLegacyTokenData` is
+  a migration bridge, not a new foundation: its `symbol` is a plain `string` (real symbols like
+  `AERO` don't fit the old closed union), so a consumer typed against `BasicTokenData` widens one
+  annotation to `LegacyTokenData` and nothing else changes. `amount` and `usdValue` come back as
+  `''` — never fabricated.
+- **A token converted with `toLegacyTokenData` must not be fed back into a swap.** The legacy
+  shape represents the native currency with `address: null`; `getSwapQuote` and the approval step
+  identify native by the zero address instead, so a converted native token silently fails as
+  `UNSUPPORTED_TOKEN`. Use the original `SwapToken` for quoting; the conversion is for rendering
+  only.
+- **Logo URLs point at hosts this SDK doesn't control** (`coin-images.coingecko.com`,
+  `static.debank.com`, `raw.githubusercontent.com`). A selector rendering them directly needs a
+  CSP that allows those hosts.
+
 ### Types
 
 All interfaces and type aliases are exported for consumer use:
 
-`BroadcastTransactionOptions`, `BuildMaxNativeTransferTxOptions`, `BuildUnsignedTransferTxOptions`, `BuildBaseUnsignedTransferTxParams`, `EstimateGasLimitFromProviderProps`, `GasEstimateResult`, `EstimateTransactionOptions`, `EstimateTransactionResult`, `PrepareTransactionParams`, `PrepareTransactionResult`, `TxStatusOptions`, `TxStatusResponse`, `FormatAmountOptions`, `TransactionRequest`, `GetBalanceParams`, `GetBalancesParams`, `GetBalancesChainRequest`, `GetBalanceResult`, `ChainBalances`, `TokenBalance`, `ChainGroup`, `NetworkField`, `NetworkId`, `NetworkCategory`, `BasicTokenData`, `BasicTokenSymbol`, `ChainTokenDataMap`, `StablecoinContractData`, `StablecoinContractsByChainId`, `StablecoinSymbol`, `EvmGeneratedWallet`, `EvmDerivedWallet`, `EntropySource`, `SwapState`, `SwapPhase`, `SwapTxOutcome`, `SwapErrorCode`, `SwapTokenInfo`, `SwapRouteSummary`, `LifiTransactionRequest`, `SwapQuote`, `GetSwapQuoteParams`, `BuildSwapApprovalTxsParams`, `BuildSwapTxParams`, `ResolveSwapStateParams`.
+`BroadcastTransactionOptions`, `BuildMaxNativeTransferTxOptions`, `BuildUnsignedTransferTxOptions`, `BuildBaseUnsignedTransferTxParams`, `EstimateGasLimitFromProviderProps`, `GasEstimateResult`, `EstimateTransactionOptions`, `EstimateTransactionResult`, `PrepareTransactionParams`, `PrepareTransactionResult`, `TxStatusOptions`, `TxStatusResponse`, `FormatAmountOptions`, `TransactionRequest`, `GetBalanceParams`, `GetBalancesParams`, `GetBalancesChainRequest`, `GetBalanceResult`, `ChainBalances`, `TokenBalance`, `ChainGroup`, `NetworkField`, `NetworkId`, `NetworkCategory`, `BasicTokenData`, `BasicTokenSymbol`, `ChainTokenDataMap`, `StablecoinContractData`, `StablecoinContractsByChainId`, `StablecoinSymbol`, `EvmGeneratedWallet`, `EvmDerivedWallet`, `EntropySource`, `SwapState`, `SwapPhase`, `SwapTxOutcome`, `SwapErrorCode`, `SwapTokenInfo`, `SwapRouteSummary`, `LifiTransactionRequest`, `SwapQuote`, `GetSwapQuoteParams`, `BuildSwapApprovalTxsParams`, `BuildSwapTxParams`, `ResolveSwapStateParams`, `SwapToken`, `GetAllSwapTokensParams`, `LegacyTokenData`.
 
 ## Design notes
 

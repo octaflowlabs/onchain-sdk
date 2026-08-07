@@ -210,7 +210,7 @@ tree** and confirm the three functions resolve while `fetchTokensForChains` and 
 `undefined` on the barrel object.
 **Depends on:** T-4, T-5, T-6
 
-### [ ] T-8 · Prove the shared cache and the native flag against 001
+### [x] T-8 · Prove the shared cache and the native flag against 001
 **Files:** none — records land in this file
 **Satisfies:** TR-12, TFC-7, TFC-4 · **Plan:** D-4, D-5
 
@@ -232,9 +232,34 @@ would fail `getSwapQuote`'s token lookup today.** TFC-4 makes curation best-effo
 count is not a failure of this task; it is the number that tells us whether R-1's drift is a
 theoretical risk or an immediate one, and it is worth having on the day we ship rather than the
 day a user finds it.
+
+**Results, 2026-08-06.** `getTokens`'s export is a non-configurable ESM-interop getter and cannot
+be monkey-patched directly; `@lifi/sdk`'s `request()` helper goes through the global `fetch`, so
+the call counter wraps `fetch` and counts requests containing `/v1/tokens` — `getQuote`'s real
+`/v1/quote` calls pass through unmodified. This is a live run with a counter attached, not a mock.
+
+1. **Direction 1 (Base, 8453).** `getAllSwapTokens({ chainIds: [8453] })` issued exactly one
+   `/v1/tokens` request. `getSwapQuote` for ETH → WBTC (`"0.001"`) immediately after issued **zero**
+   further `/v1/tokens` requests and returned a real quote (`1000000000000000` wei ETH →
+   `~2949` wei WBTC, spender `0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE`) — confirming
+   `getSwapQuote` validated the pair against the exact cache `getAllSwapTokens` populated (TR-12).
+2. **Direction 2 (Arbitrum, 42161, cold cache).** `getSwapQuote` for ETH → WBTC ran first and
+   issued exactly one `/v1/tokens` request (the cold fetch). `getAllSwapTokens({ chainIds: [42161] })`
+   immediately after issued **zero** further requests and returned Arbitrum's full set —
+   confirming the cache holds across both readers regardless of which runs first (TR-16).
+3. **TFC-7 (pure).** A hand-built `SwapQuote` whose `fromToken.address` is Base's curated
+   `isNative` entry (`ETH`, zero address), passed to `buildSwapApprovalTxs`, returned `[]` — the
+   token a consumer sees flagged native is the token 001's approval step needs nothing for.
+4. **Drift measurement.** All 64 curated entries across the 16 supported chains were checked
+   against a fresh `GET /v1/tokens` response, address by address: **0/64 would fail
+   `getSwapQuote`'s `UNSUPPORTED_TOKEN` lookup today.** R-1's drift risk is present in principle
+   (TR-18 performs no re-verification per call) but is measured at zero on the day of shipping,
+   not assumed.
+
+**4/4 passed.**
 **Depends on:** T-4, T-5
 
-### [ ] T-9 · Document the public surface
+### [x] T-9 · Document the public surface
 **File:** `README.md`
 **Satisfies:** TFC-4, TFC-5, TFC-8, TFC-10, TFC-11, TFC-12, TFC-13 · **Plan:** public surface
 
