@@ -402,12 +402,34 @@ consequential line in this feature and only the first of those three observation
 
 ## Risks and open items
 
-- **R-1 — A wrong hash is `pending` forever, by design.** D-2 maps 404 to `pending`, and CC-20
-  forbids a timeout. A consumer that stores the wrong hash, or asks about a chain pair the
-  transaction was not on, polls indefinitely with no SDK-side rescue. This is the deliberate cost of
-  CC-13's refusal to distinguish not-yet-indexed from does-not-exist — a distinction that cannot be
-  made from outside without inventing a deadline. Named here rather than hedged: the consumer owns
-  the give-up policy (CFC-13), and the README says so.
+- **R-1 — A wrong hash is `pending` forever, by design; a wrong chain pair is not, and that was
+  wrong to assume.** D-2 maps 404 to `pending`, and CC-20 forbids a timeout, so a consumer that
+  stores a hash the routing service genuinely never indexes polls indefinitely with no SDK-side
+  rescue — that half is real and is the deliberate cost of CC-13's refusal to distinguish
+  not-yet-indexed from does-not-exist, a distinction that cannot be made from outside without
+  inventing a deadline.
+
+  **The other half — "or asks about a chain pair the transaction was not on" — is empirically
+  false, corrected here rather than left standing.** T-8's scenario 8 queried `getSwapSettlement`
+  with a real, settled origin hash (scenario 1's, a genuine Base→Polygon transfer) against
+  `fromChainId`/`toChainId` set to Linea and Scroll — a pair the transaction has nothing to do
+  with. Four polls, five seconds apart: it resolved to `success` on the fourth, carrying the
+  *correct* settlement data for the *real* Base→Polygon transfer. `/status` locates a transfer by
+  **hash alone**; `fromChain`/`toChain` are not a filter on that lookup. Consistent with what D-2
+  already measured for a hash the service does not know at all — the 404 message differs when a
+  chain is supplied (`"...not found on chain '137'"`) versus when none is (`"...not found in any
+  chain"`) — the chain parameters shape the *message*, not the *search*.
+
+  **Consequence, stated plainly:** a consumer that swaps `fromChainId`/`toChainId` by mistake, or
+  reuses stale chain values from an unrelated swap, does not get an error back — it gets a
+  plausible-looking, entirely real settlement report for whatever transfer the hash actually
+  belongs to. CC-11's "identified by the hash of its origin transaction and the two chains it
+  spans" describes the request's parameters accurately; it was never a claim that the three are
+  cross-validated against each other, and this finding is why that distinction now matters. Not
+  reopened as a defect — validating the pair against the hash would need a second, separate lookup
+  this operation does not otherwise require, for a mistake CC-12's whole design already assumes the
+  consumer avoids by keeping the right values durably in the first place. Left to the consumer's
+  own bookkeeping, and named here so it is a known characteristic, not a surprise.
 - **R-2 — Polling an unauthenticated endpoint, times a hundred.** A ten-minute transfer polled every
   five seconds is ~120 requests against `li.quest` per swap, with no API key. 001's R-3 already
   flagged rate limiting as a thing to watch with only a per-request `integrator` string for

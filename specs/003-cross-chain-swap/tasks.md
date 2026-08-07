@@ -324,48 +324,86 @@ set`). `grep -n "CROSS_CHAIN_NOT_SUPPORTED" README.md` returns exactly the one i
 `yarn prettier --check README.md` and `yarn build` both clean.
 **Depends on:** T-6
 
-### [ ] T-8 · On-chain verification run
+### [x] T-8 · On-chain verification run
 **Files:** none (records land in this file)
 **Satisfies:** CC-1, CC-4, CC-6, CC-11, CC-13, CC-14, CC-18, CC-19, CC-25, CC-26, CFC-4, CFC-7 end to end
 **Plan:** verification approach
 
 Executed manually from the `wallet-broadcasting` test repo against a symlinked build, using the SDK's
-own `signTransaction` + `broadcastTransaction`, as in 001 and 002. Chains: **Polygon (137), Base
-(8453), Linea (59144), BSC (56), Scroll (534352)** — all five are in 001's supported set.
+own `signTransaction` + `broadcastTransaction`, as in 001 and 002. Chains actually used: **Base
+(8453), Polygon (137), Scroll (534352), BSC (56), Linea (59144)** — the full five-chain set named in
+the plan. Each scenario ran as its own exported function in one shared harness file; only one is
+invoked per run.
 
-Cross-chain runs differ from 001's in one practical respect: the interesting part is the *middle*.
-**Every settling scenario records the report at three points** — immediately after broadcast
-(expected `pending`, arriving as a 404), mid-flight (expected `pending`, arriving as a 200), and at
-settlement. The first of those three is the only observation that exercises D-2's 404→`pending`
-mapping, which is the single most consequential line in this feature.
+Every settling scenario recorded the report at (at least) two points before settlement, not the three
+originally planned — the point that matters most, immediately after broadcast, still landed on every
+run: **`t+0.4`–`0.6s`, `outcome: 'pending'`, backed by a live HTTP 404** (`"...not found on chain
+'<id>'"`). The distinct "mid-flight, still-404" and "mid-flight, now-200-PENDING" split collapsed in
+practice because every settlement completed in **8–9 seconds** — Across (the tool LI.FI routed all
+three funded scenarios through) settles fast enough that there was rarely a second poll before the
+third one already showed `success`. The 404→`pending` mapping, the single most consequential line in
+this feature, is confirmed live in scenarios 1, 2 and 3 alike.
 
-| # | Scenario | Chains | Pair | Gas | Clauses | Result |
-|---|---|---|---|---|---|---|
-| 1 | cross-chain, native input, zero approvals | Base → Polygon | ETH → USDC | yes | CC-1, CC-11, CC-14, CC-18, CC-25, CC-26 | |
-| 2 | cross-chain ERC-20 → ERC-20, first time: approval on origin + mandatory re-quote (FC-15) | Polygon → Base | USDC → USDC | yes | CC-9, CC-10, CFC-4, CFC-17 | |
-| 3 | same pair repeated, empty approval list | Polygon → Base | USDC → USDC | yes | SDK-15 across chains | |
-| 4 | **same-chain regression** — a full 1.8.0 flow, unedited, and `getSwapSettlement` never called | Scroll or Linea, one chain | any | yes | CC-2, CFC-7 | |
-| 5 | destination-chain token validation: a token that exists on origin and not on destination | BSC → Linea | a BSC-only token | **no** | CC-4 | |
-| 6 | cross-chain with a differing `toAddress` → `UNSUPPORTED_RECIPIENT`, zero network calls | Polygon → Base | any | **no** | CC-6 | |
-| 7 | cross-chain quote held past 30 s → `QUOTE_EXPIRED` | Polygon → Base | USDC → USDC | **no** | CC-8 | |
-| 8 | settlement asked with a hash that is real but scoped to the wrong chain pair → `pending`, indefinitely | reuse scenario 1's hash | — | **no** | CC-13, CC-20, R-1 | |
+| # | Scenario | Chains | Pair | Gas | Result |
+|---|---|---|---|---|---|
+| 1 | cross-chain, native input, zero approvals | Base → Polygon | ETH → USDC | yes | swap `0x1b421b2fad81ae9e85c82b83f20dea57217a45745797221a6c994502cbd7b86e`; destination `0xb36b658d33c6350b8eb76d1d70435f058faa38c9cfa6cacdd5d19e6da03bffeb`; `pending` (404) at t+0.6s and t+0.7s, `success` at t+8.6s; received `3775766` USDC (6dp) against a quoted `toAmountMin` of `3756886` — above the guaranteed minimum, as it must be |
+| 2 | cross-chain ERC-20 → ERC-20, first time: approval on origin + mandatory re-quote | Polygon → Base | USDC → USDC | yes | approval `0x040d41eb8bd75b281ec76b8dde220c1d3a6040bbd3513360da4d7f57b4201642` (nonce 5, one tx — starting allowance was 0, the SDK-16 path); re-quoted after confirmation as FC-15 requires; swap `0xc70a3f75484da9814a2703ff88a85eacf1540d0f167c3842b57382c4ff66466d`; destination `0x81204a91ead073196c823fe299b0b09d30cb0d6082d2a9bf926cf9fd2ba46012`; `pending` (404) at t+0.4s and t+0.6s, `success` at t+8.1s; received `994817` USDC (6dp) |
+| 3 | same pair repeated, empty approval list | Polygon → Base | USDC → USDC | yes | on-chain allowance read as `MaxUint256` against a required `1000000` — confirmed real, not assumed; `buildSwapApprovalTxs` → `[]`; swap `0x8257fd55e84b30accd1d8ddd799c33bc05630cee71ca0c48aa1541490b318004`; destination `0x9a448810601206b520c938fbebbee249237799b7fda121db031c98dc2cb17b2d`; `pending` (404) at t+0.4s and t+0.5s, `success` at t+8.4s; received `994815` USDC (6dp) |
+| 4 | **same-chain regression** — a full 1.8.0 flow, unedited, `getSwapSettlement` never called | Scroll, one chain | ETH → WETH (native wrap) | yes | `buildSwapApprovalTxs` → `[]` (native input); swap `0x3e3c28e3e0969bc2111023e8b2af68cb8e6aeff3893ff99bf85fdc61df464410`; `resolveSwapState({ phase: 'swap', outcome: 'success' })` → `'done'` via the ordinary `txStatus`-driven path, exactly as in 001; the harness's own source confirms `getSwapSettlement` is not called anywhere in this scenario's code path |
+| 5 | destination-chain token validation | BSC → Linea | CAKE (`0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82`), present on BSC, confirmed absent from Linea via `getAllSwapTokens` before quoting | no | `getSwapQuote` → `SwapError { code: 'UNSUPPORTED_TOKEN', message: 'One or both tokens are not swappable on their own chain' }` — the exact string T-3 wrote, confirming the destination-aware lookup ran, not the retired origin-only one |
+| 6 | cross-chain with a differing `toAddress` → `UNSUPPORTED_RECIPIENT` | Polygon → Base | native → USDC | no | See note below — first attempt was a harness setup error, not a real run of this case. Corrected rerun: `SwapError { code: 'UNSUPPORTED_RECIPIENT', message: 'A cross-chain swap can only deliver to the address supplying the input' }`. The same-chain control case in the same script (identical distinct `toAddress`, `fromChainId === toChainId`) succeeded both times, confirming CC-2 |
+| 7 | cross-chain quote held past 30 s | Polygon → Base | USDC → USDC | no | held 35.0s past `expiresAt` → `SwapError { code: 'QUOTE_EXPIRED', message: 'This quote has expired; request a new one' }` |
+| 8 | settlement asked with a real hash scoped to the **wrong chain pair** | reused scenario 1's real hash, queried against Linea/Scroll — a pair that hash has nothing to do with | no | See note below — **did not stay `pending`**. Resolved to `success` on the 4th poll (20s in, 5s apart), carrying the correct settlement data for the real Base→Polygon transfer. R-1 corrected in plan.md |
 
-Scenarios 5–8 spend no gas: three fail before any transaction is built, and 8 reuses a hash scenario
-1 already produced. Only 1–4 cost real funds.
+Scenarios 5–8 spent no gas: three fail before any transaction is built, and 8 reuses a hash scenario 1
+already produced. Only 1–4 cost real funds.
 
-**Two things worth recording if they occur, neither engineered for:** a `PARTIAL` settlement (R-3 —
-would close the one branch of CC-18 that no scenario provokes deliberately), and any HTTP 429 during
-the three-point polling (R-2 — the rate-limiting risk, which only sustained real polling can
-measure). Note the elapsed origin-to-settlement time on each of 1–3 regardless; the README's cadence
-recommendation is currently a guess and this is the only chance to ground it.
+**Scenario 6, explained rather than just re-run.** The first attempt threw `PROVIDER_ERROR` with an
+upstream message (`"None of the available routes could successfully generate a tx"`) instead of
+`UNSUPPORTED_RECIPIENT` — flagged `UNEXPECTED` by the harness's own assertion. Confirmed with the
+user: that attempt used the **same address for `toAddress` and `fromAddress`**, so CC-6's guard
+correctly did not fire (it only rejects a *differing* recipient), and the request went to the network
+where an unrelated, transient RPC failure produced the `PROVIDER_ERROR`. Not a false result — a
+different case than the one intended. The corrected rerun, with a genuinely distinct `toAddress`
+(`0x000000000000000000000000000000000000dEaD`), produced `UNSUPPORTED_RECIPIENT` as expected. CC-6's
+guard is a synchronous, zero-network local check (T-3's fixtures already proved this exhaustively);
+nothing about this incident implicates it.
+
+**Scenario 8 is the one genuine finding of this run, and it corrects a stated risk rather than
+confirming one.** The harness's actual code (`scenario8_settlementWrongChainPair`) queried
+`getSwapSettlement` with `fromChainId: LINEA.chainId, toChainId: SCROLL.chainId` against scenario 1's
+real Base→Polygon hash — a deliberately, verifiably wrong pair, not a harness bug. LI.FI's `/status`
+resolved it anyway, correctly, on the 4th poll. **`fromChain`/`toChain` do not gate the lookup — LI.FI
+finds a transfer by hash alone**, and the chain parameters only shape the 404 message when the hash
+truly isn't found (consistent with what D-2 already measured: a chain-specific 404 message when a
+chain is supplied, a chain-agnostic one when none is). R-1 in plan.md claimed indefinite `pending` for
+this exact case; that claim is empirically false and has been rewritten there with this finding,
+dated. The "wrong hash entirely" half of R-1 is untouched and still holds — every unrelated 404
+observed across all eight scenarios confirms it.
+
+**Two things flagged as worth recording if they occurred — neither did.** No `PARTIAL` settlement
+(R-3's open branch of CC-18 stays unexercised) and no HTTP 429 during any polling (R-2's rate-limiting
+risk stays unmeasured under real sustained load — three settlements at ~8s each is not sustained
+enough to say anything about it either way).
+
+**Elapsed origin-to-settlement time, grounding the README's cadence recommendation for the first
+time with real data:** 8.6s, 8.1s, 8.4s across scenarios 1–3. All three routed through Across. This is
+far faster than the "minutes" framing used throughout spec.md and plan.md's prose — that framing is
+not wrong (LI.FI can and does route through slower bridges, and nothing here bounds worst case), but
+the README's 5–10s polling floor is now confirmed to land a consumer 1–2 polls into a typical Across
+settlement, not dozens.
 
 **Not covered here, stated plainly rather than left implicit:** a genuine cross-chain **revert** on
 the origin chain, which would close R-5 by confirming D-3's `FAILED` finding against a bridge rather
-than against a same-chain swap. Provoking one deliberately costs a transaction to set up and cannot
-be made to happen on demand.
+than against a same-chain swap. Provoking one deliberately costs a transaction to set up and cannot be
+made to happen on demand.
 
-**Verify** `chain` — every scenario recorded with real hashes, the three-point report readings, and
-elapsed times.
+**Verify** `chain` — 8/8 scenarios recorded with real hashes (1–4), real error codes and messages
+(5–8), and elapsed times. One correction made to plan.md (R-1) on the strength of scenario 8's result,
+not swept into a footnote. A consumer-facing consequence of that same finding — a wrong chain pair
+paired with a real hash resolves silently rather than erroring — was also added to README.md's
+cross-chain behaviors list, since it is exactly the kind of thing FC-11/CFC-16's "the consumer can
+branch exhaustively" promise does not cover: there is no error code for it to branch on.
 **Depends on:** T-6
 
 ### [ ] T-9 · Release 1.9.0

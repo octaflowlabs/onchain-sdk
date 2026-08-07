@@ -221,6 +221,12 @@ a report the consumer already holds. A full cross-chain flow branches on three t
 - **Persist the origin transaction hash and both chain IDs once the swap transaction is
   broadcast.** That's the entire state `getSwapSettlement` needs — no quote, nothing else — so a
   page reload or app restart can resume reporting settlement with no other memory.
+- **Get the chain IDs right — the SDK cannot catch it if you don't.** The routing service locates
+  a transfer by its hash alone; `fromChainId`/`toChainId` are not validated against it. A hash
+  paired with the wrong chain IDs still resolves — correctly, for whatever transfer that hash
+  actually belongs to — rather than failing. Swap the two chain IDs by mistake, or reuse stale
+  ones from an unrelated swap, and you'll get a real, plausible-looking settlement report for the
+  wrong transfer, not an error.
 - **A completed cross-chain swap may deliver less than quoted, or a different token entirely.**
   Bridging can fall back to handing over the bridged asset itself when the destination-side swap
   can't be completed. Render `receivedAmount` / `receivedToken` from the settlement report, never
