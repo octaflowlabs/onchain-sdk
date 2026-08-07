@@ -10,6 +10,8 @@ export {
   BasicTokenData,
   BasicTokenSymbol,
   ChainTokenDataMap,
+  toLegacyTokenData,
+  LegacyTokenData,
 } from './constants/BASIC_TOKENS_REGISTRY'
 export {
   STABLECOIN_CONTRACTS_BY_CHAIN_ID,

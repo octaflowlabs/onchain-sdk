@@ -157,7 +157,7 @@ a second call reads.
 `review` — `getAllSwapTokens` resolves from the package entry point.
 **Depends on:** T-2
 
-### [ ] T-6 · The legacy bridge and the deprecation markers
+### [x] T-6 · The legacy bridge and the deprecation markers
 **File:** `src/constants/BASIC_TOKENS_REGISTRY.ts`, `src/index.ts`
 **Satisfies:** TR-17, TR-21, TR-22, TR-23, TFC-11, TFC-12, TFC-13 · **Plan:** D-7, D-10
 

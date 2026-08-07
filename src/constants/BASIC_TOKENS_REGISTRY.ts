@@ -1,3 +1,6 @@
+/** local imports */
+import { SwapToken } from '../types/swap'
+
 export type BasicTokenSymbol =
   | 'ETH'
   | 'BNB'
@@ -27,6 +30,7 @@ export type BasicTokenSymbol =
   | 'XPL'
   | 'USDC.e'
 
+/** @deprecated Superseded by SwapToken (spec 002-token-registry). */
 export interface BasicTokenData {
   id: string
   address: string | null
@@ -43,6 +47,7 @@ export interface BasicTokenData {
 export type ChainTokenDataMap = Record<number, BasicTokenData[]>
 
 //! IMPORTANT: ALL THESE TOKENS SHOULD COME FROM AN EXTERNAL SOURCE IN THE FUTURE, THEY ARE HARDCODED FOR TESTING PURPOSES ONLY. DO NOT TREAT THIS AS A SOURCE OF TRUTH FOR TOKEN ADDRESSES OR ANY OTHER TOKEN DATA, AS THIS IS LIKELY TO BE OUTDATED AND INACCURATE.
+/** @deprecated Superseded by getCuratedSwapTokens (spec 002-token-registry). */
 export const BASIC_TOKENS_BY_CHAIN: ChainTokenDataMap = {
   1: [
     {
@@ -224,7 +229,8 @@ export const BASIC_TOKENS_BY_CHAIN: ChainTokenDataMap = {
       symbol: 'WBNB',
       name: 'Wrapped BNB',
       decimals: 18,
-      iconUrl: 'https://assets.coingecko.com/coins/images/12591/standard/binance-coin-logo.png?1696512401',
+      iconUrl:
+        'https://assets.coingecko.com/coins/images/12591/standard/binance-coin-logo.png?1696512401',
       amount: '38.80',
       usdValue: '150,000 USD',
       isNative: false,
@@ -568,7 +574,8 @@ export const BASIC_TOKENS_BY_CHAIN: ChainTokenDataMap = {
       symbol: 'HYPE',
       name: 'Hyperliquid',
       decimals: 18,
-      iconUrl: 'https://assets.coingecko.com/coins/images/50882/standard/hyperliquid.jpg?1729431300',
+      iconUrl:
+        'https://assets.coingecko.com/coins/images/50882/standard/hyperliquid.jpg?1729431300',
       amount: '38.80',
       usdValue: '150,000 USD',
       isNative: true,
@@ -580,7 +587,8 @@ export const BASIC_TOKENS_BY_CHAIN: ChainTokenDataMap = {
       symbol: 'WHYPE',
       name: 'Wrapped HYPE',
       decimals: 18,
-      iconUrl: 'https://assets.coingecko.com/coins/images/50882/standard/hyperliquid.jpg?1729431300',
+      iconUrl:
+        'https://assets.coingecko.com/coins/images/50882/standard/hyperliquid.jpg?1729431300',
       amount: '38.80',
       usdValue: '150,000 USD',
       isNative: false,
@@ -607,7 +615,8 @@ export const BASIC_TOKENS_BY_CHAIN: ChainTokenDataMap = {
       symbol: 'MNT',
       name: 'Mantle Native',
       decimals: 18,
-      iconUrl: 'https://assets.coingecko.com/coins/images/30980/standard/MNT_Token_Logo.png?1765516974',
+      iconUrl:
+        'https://assets.coingecko.com/coins/images/30980/standard/MNT_Token_Logo.png?1765516974',
       amount: '38.80',
       usdValue: '150,000 USD',
       isNative: true,
@@ -779,7 +788,8 @@ export const BASIC_TOKENS_BY_CHAIN: ChainTokenDataMap = {
       symbol: 'XPL',
       name: 'Plasma',
       decimals: 18,
-      iconUrl: 'https://assets.coingecko.com/coins/images/66489/standard/Plasma-symbol-green-1.png?1755142558',
+      iconUrl:
+        'https://assets.coingecko.com/coins/images/66489/standard/Plasma-symbol-green-1.png?1755142558',
       amount: '38.80',
       usdValue: '150,000 USD',
       isNative: true,
@@ -978,7 +988,8 @@ export const BASIC_TOKENS_BY_CHAIN: ChainTokenDataMap = {
       symbol: 'AVAX',
       name: 'Avalanche',
       decimals: 18,
-      iconUrl: 'https://assets.coingecko.com/coins/images/12559/standard/Avalanche_Circle_RedWhite_Trans.png?1696512369',
+      iconUrl:
+        'https://assets.coingecko.com/coins/images/12559/standard/Avalanche_Circle_RedWhite_Trans.png?1696512369',
       amount: '38.80',
       usdValue: '150,000 USD',
       isNative: true,
@@ -1307,3 +1318,35 @@ export const getTokensByChain = (chainId?: number): BasicTokenData[] => {
   if (!chainId) return MOCK_TOKENS
   return BASIC_TOKENS_BY_CHAIN[chainId] || []
 }
+
+/**
+ * Legacy migration bridge — spec 002-token-registry
+ *
+ * Satisfies:
+ *  - TR-21  a conversion of published tokens into the deprecated registry's shape, deprecated
+ *           from the moment it is introduced
+ *  - TR-22  amount and usdValue are never fabricated — always ''
+ *  - TR-23  a native token converts with address: null, matching the deprecated shape; the
+ *           published token's own address (usable in a swap) is not carried through
+ */
+
+/** @deprecated Superseded by SwapToken (spec 002-token-registry). Bridge output only. */
+export type LegacyTokenData = Omit<BasicTokenData, 'symbol'> & { symbol: string }
+
+/**
+ * @deprecated Superseded by getCuratedSwapTokens / getAllSwapTokens (spec 002-token-registry).
+ * Exists to make migration off BASIC_TOKENS_BY_CHAIN incremental, not to be built upon.
+ */
+export const toLegacyTokenData = (tokens: SwapToken[]): LegacyTokenData[] =>
+  tokens.map((token) => ({
+    id: token.symbol.toLowerCase(),
+    address: token.isNative ? null : token.address,
+    chainId: token.chainId,
+    symbol: token.symbol,
+    name: token.name,
+    decimals: token.decimals,
+    iconUrl: token.logoURI ?? '',
+    amount: '',
+    usdValue: '',
+    isNative: token.isNative,
+  }))
