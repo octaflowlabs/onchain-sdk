@@ -183,7 +183,7 @@ into `dist/index.d.ts`. `toLegacyTokenData` and `LegacyTokenData` resolve from t
 
 ## Integration
 
-### [ ] T-7 · Audit the public export surface
+### [x] T-7 · Audit the public export surface
 **File:** `src/index.ts`
 **Satisfies:** TFC-1 · **Plan:** D-1, 001's D-11
 
