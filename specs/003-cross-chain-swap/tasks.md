@@ -240,7 +240,7 @@ byte-identical in full.
 
 ## Integration
 
-### [ ] T-6 · Audit the public export surface
+### [x] T-6 · Audit the public export surface
 **File:** `src/index.ts`
 **Satisfies:** CFC-18 · **Plan:** D-8, public surface
 
@@ -254,15 +254,23 @@ complete and contains nothing more.
 
 Must **not** be exported: `fetchSettlement`, and anything else under `swap/internal/`.
 
+**No edits were needed**, exactly as with 001's T-12: T-1 and T-4 already added their own exports
+under the standing rule, so this task is a confirmation, not a batch of fixes. `src/index.ts` carries
+no JSDoc traceability header of its own — it never has, in either 001 or 002 — so there is no header
+to add here; the barrel's role is mechanical re-export, and the convention places the traceability
+block on the feature file that defines each symbol, not on the file that re-exports it.
+
 **Verify** `review` — the five symbols cross-checked against `src/index.ts` and against the built
-`dist/index.d.ts`; `grep -n "internal/" src/index.ts` and `grep -n "export \*" src/index.ts` return
-nothing; `grep -rln "@lifi/sdk" src/` still returns exactly one file, confirming 001's D-1 isolation
-survived this feature too. Then, as 001's T-12 did, **import the built package from outside the repo
-tree** exactly as a consumer would and confirm `getSwapSettlement` resolves as a function from the
-bare entry point while `fetchSettlement` is `undefined` on the barrel object.
+`dist/index.d.ts`: **5/5 present in both.** `grep -n "internal/" src/index.ts` and `grep -n "export \*"
+src/index.ts` both return nothing; `grep -rln "@lifi/sdk" src/` still returns exactly one file
+(`swap/internal/lifiClient.ts`), confirming 001's D-1 isolation survived this feature too. Then, as
+001's T-12 did, **imported the built package from outside the repo tree** — a `node -e` invocation run
+from the scratch directory, not this one — exactly as a consumer would: `getSwapSettlement` resolves
+as a function from the bare entry point, while `fetchSettlement`, `isSwapSupportedChain`,
+`readAllowance` and `isNativeTokenAddress` are all `undefined` on that same barrel object.
 **Depends on:** T-4
 
-### [ ] T-7 · Document the public surface
+### [x] T-7 · Document the public surface
 **File:** `README.md`
 **Satisfies:** CFC-1 – CFC-18 · **Plan:** public surface, consumer flow, R-2
 
@@ -288,10 +296,32 @@ artifact and may have drifted from what shipped, which is the discipline 001's T
 finding exactly that.
 
 An HTML comment citing the clause ids sits at the top of the new subsection, per CLAUDE.md's
-traceability exception.
+traceability exception. The existing comment before `### Swaps` (001's `FC-1..FC-16`) was extended in
+place with `CFC-1..CFC-18`, rather than adding a second comment, since 003's content joins that same
+section rather than starting a new one.
 
-**Verify** `review` — every documented signature matches the emitted `.d.ts`; all eight call-outs
-present.
+**One drift caught by pulling from `dist/*.d.ts` instead of copying from plan.md**, exactly the
+discipline this task exists to enforce: `getSwapSettlement`'s destructured parameter list in the
+built declaration — `({ txHash, fromChainId, toChainId, }: GetSwapSettlementParams) => ...` — is
+simplified in the README table to `(params: GetSwapSettlementParams) => ...`, matching the
+established convention for every other entry (`getBalance`, `getSwapQuote`, etc., all of which also
+destructure in source). Not a discrepancy, just confirming which convention applies before writing it
+down.
+
+**One line outside the Swaps section was also stale and is not scoped to this task, but was fixed
+here rather than left inconsistent with what the task just wrote:** the file's own top-level
+description (line 3–5) still read "EVM same-chain swaps via LI.FI." Updated to "same-chain and
+cross-chain EVM swaps via LI.FI."
+
+**Verify** `review` — `getSwapSettlement`'s signature and `SwapSettlementReport`'s field list
+cross-checked against `dist/swap/getSwapSettlement.d.ts` and `dist/types/swap.d.ts` directly, not
+plan.md. All eight required call-outs confirmed present by grep, one clause at a time: CFC-6
+(`switch to feeding the outcome from getSwapSettlement`), CFC-7 (`Same-chain swaps are unchanged in
+every respect`), CFC-8 (`Persist the origin transaction hash and both chain IDs`), CFC-11 (`may
+deliver less than quoted`), CFC-12 (`` reason `refunded` ``), CFC-13/R-2 (`There is no timeout`),
+CFC-15 (`` `CROSS_CHAIN_NOT_SUPPORTED` no longer exists ``), CFC-16 (`**second, disjoint** closed
+set`). `grep -n "CROSS_CHAIN_NOT_SUPPORTED" README.md` returns exactly the one intentional mention;
+`yarn prettier --check README.md` and `yarn build` both clean.
 **Depends on:** T-6
 
 ### [ ] T-8 · On-chain verification run

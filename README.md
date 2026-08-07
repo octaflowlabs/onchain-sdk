@@ -2,7 +2,7 @@
 
 Lightweight TypeScript SDK for EVM onchain utilities. It provides helpers for
 balances, transaction building, broadcasting, gas estimation, wallet derivation,
-amount formatting, and EVM same-chain swaps via LI.FI.
+amount formatting, and same-chain and cross-chain EVM swaps via LI.FI.
 
 ## Install
 
@@ -119,26 +119,29 @@ Each `NetworkField` entry includes `id`, `name`, `chainId`, `rpcUrl`, optional `
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `extractPoolInboundStablecoinEvents` | `(payload, poolAddress) => PoolInboundStablecoinEvent[]` — extract inbound token transfers to a pool when the token contract is an allowlisted stablecoin. |
 
-<!-- Satisfies FC-1, FC-2, FC-3, FC-4, FC-5, FC-6, FC-7, FC-8, FC-9, FC-10, FC-11, FC-12, FC-13, FC-14, FC-15, FC-16 -->
+<!-- Satisfies FC-1, FC-2, FC-3, FC-4, FC-5, FC-6, FC-7, FC-8, FC-9, FC-10, FC-11, FC-12, FC-13, FC-14, FC-15, FC-16, CFC-1, CFC-2, CFC-3, CFC-4, CFC-5, CFC-6, CFC-7, CFC-8, CFC-9, CFC-10, CFC-11, CFC-12, CFC-13, CFC-14, CFC-15, CFC-16, CFC-17, CFC-18 -->
 
 ### Swaps
 
-Same-chain EVM token swaps, quoted and routed through [LI.FI](https://li.fi). The SDK never
-signs or broadcasts a swap transaction — every operation below returns an **unsigned**
-transaction (or a list of them) that the consumer signs and submits through the SDK's existing
-`broadcastTransaction`, exactly as it would for a transfer. Cross-chain requests
-(`fromChainId !== toChainId`) are rejected with `CROSS_CHAIN_NOT_SUPPORTED`; only same-chain
-swaps are in scope today.
+EVM token swaps, quoted and routed through [LI.FI](https://li.fi) — same-chain and cross-chain
+alike. The SDK never signs or broadcasts a swap transaction — every operation below returns an
+**unsigned** transaction (or a list of them) that the consumer signs and submits through the
+SDK's existing `broadcastTransaction`, exactly as it would for a transfer. A cross-chain swap
+(`fromChainId !== toChainId`) is signed **once, on the origin chain** — nothing is signed on the
+destination chain, and the consumer never moves the holder to another network mid-flow.
+**Same-chain swaps are unchanged in every respect**: the flow that worked before this release
+needs no edit, performs no extra network access, and never calls `getSwapSettlement`.
 
-| Export                     | Signature                                                               | Description                                                                                                                                                                                                                                                                                                                  |
-| -------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `getSwapQuote`             | `(params: GetSwapQuoteParams) => Promise<SwapQuote>`                    | Quote a swap. The amount is a decimal string in the input token's own units (e.g. `"1.5"`); the SDK resolves decimals and converts internally.                                                                                                                                                                               |
-| `buildSwapApprovalTxs`     | `(params: BuildSwapApprovalTxsParams) => Promise<TransactionRequest[]>` | Build the ERC-20 approval(s) a swap needs, given a quote. Returns `[]`, `[approve]`, or `[reset, approve]` — see notes below.                                                                                                                                                                                                |
-| `buildSwapTx`              | `(params: BuildSwapTxParams) => Promise<PrepareTransactionResult>`      | Build the swap transaction itself: gas limit, nonce and fee data are already resolved, ready to sign.                                                                                                                                                                                                                        |
-| `resolveSwapState`         | `(params: ResolveSwapStateParams) => SwapState`                         | Pure function: given the current phase and a transaction outcome, returns one of `approving \| approved \| swapping \| done \| error`. No network access — before anything is submitted the caller passes `outcome: 'not-submitted'` itself; once submitted, `outcome` is `TxStatusResponse.status` from polling `txStatus`. |
-| `getSwapSupportedChainIds` | `() => number[]`                                                        | Chain IDs where swaps are available: the intersection of chains LI.FI supports and chains in `NETWORKS_REGISTRY`. A quote for any other chain fails with `UNSUPPORTED_CHAIN`.                                                                                                                                                |
-| `SwapError`                | `class extends Error`                                                   | Thrown by every swap operation on an anticipated failure. Carries `code: SwapErrorCode` (the exhaustive branch point) and an optional `details` payload. `message` is developer-facing, not UI copy.                                                                                                                         |
-| `isSwapError`              | `(e: unknown) => e is SwapError`                                        | Type guard for `SwapError`.                                                                                                                                                                                                                                                                                                  |
+| Export                     | Signature                                                               | Description                                                                                                                                                                                                                                                                                                |
+| -------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `getSwapQuote`             | `(params: GetSwapQuoteParams) => Promise<SwapQuote>`                    | Quote a swap. The amount is a decimal string in the input token's own units (e.g. `"1.5"`); the SDK resolves decimals and converts internally. Works identically whether `fromChainId` and `toChainId` match or differ.                                                                                    |
+| `buildSwapApprovalTxs`     | `(params: BuildSwapApprovalTxsParams) => Promise<TransactionRequest[]>` | Build the ERC-20 approval(s) a swap needs, given a quote. Returns `[]`, `[approve]`, or `[reset, approve]` — see notes below. Always on the **origin** chain, cross-chain included.                                                                                                                        |
+| `buildSwapTx`              | `(params: BuildSwapTxParams) => Promise<PrepareTransactionResult>`      | Build the swap transaction itself: gas limit, nonce and fee data are already resolved, ready to sign. Always on the **origin** chain, cross-chain included.                                                                                                                                                |
+| `resolveSwapState`         | `(params: ResolveSwapStateParams) => SwapState`                         | Pure function: given the current phase and a transaction outcome, returns one of `approving \| approved \| swapping \| done \| error`. No network access — see below for what outcome to feed it, which differs for a cross-chain swap.                                                                    |
+| `getSwapSettlement`        | `(params: GetSwapSettlementParams) => Promise<SwapSettlementReport>`    | **Cross-chain only.** Reports whether the funds arrived on the destination chain — the origin transaction's own receipt cannot answer that. Identified by the origin tx hash and both chain IDs; no quote required, so it survives a page reload or app restart.                                           |
+| `getSwapSupportedChainIds` | `() => number[]`                                                        | Chain IDs where swaps are available: the intersection of chains LI.FI supports and chains in `NETWORKS_REGISTRY`. A quote naming any other chain, as origin or destination, fails with `UNSUPPORTED_CHAIN`. Says nothing about which _pairs_ can be bridged — that's answered by `NO_ROUTE` at quote time. |
+| `SwapError`                | `class extends Error`                                                   | Thrown by every swap operation on an anticipated failure. Carries `code: SwapErrorCode` (the exhaustive branch point) and an optional `details` payload. `message` is developer-facing, not UI copy.                                                                                                       |
+| `isSwapError`              | `(e: unknown) => e is SwapError`                                        | Type guard for `SwapError`.                                                                                                                                                                                                                                                                                |
 
 `SwapQuote` is the value the consumer holds between steps and passes back into
 `buildSwapApprovalTxs` and `buildSwapTx`:
@@ -160,34 +163,86 @@ interface SwapQuote {
 }
 ```
 
-`SwapErrorCode` is a closed set: `NO_ROUTE`, `UNSUPPORTED_CHAIN`, `CROSS_CHAIN_NOT_SUPPORTED`,
-`UNSUPPORTED_TOKEN`, `QUOTE_EXPIRED`, `INSUFFICIENT_ALLOWANCE`, `INVALID_SLIPPAGE`,
-`EXECUTION_REVERTED`, `PROVIDER_ERROR`. A consumer can `switch` on it exhaustively.
+`fromChainId` and `toChainId` may differ — that's a cross-chain quote, requested through this
+same operation, with no separate cross-chain path. `getSwapSettlement`'s report has its own
+shape:
 
-**Five behaviors that don't show up in the signatures above, and that a consumer needs to know:**
+```ts
+interface SwapSettlementReport {
+  outcome: 'pending' | 'success' | 'failed'
+  reason?: 'refunded' | 'execution-failed' | 'not-recognized' // present only when outcome is 'failed'
+  receivedAmount?: bigint // present only when outcome is 'success'; never the quoted figure
+  receivedToken?: SwapTokenInfo // present only when outcome is 'success'; may differ from the quote
+  destinationTxHash?: string // present only when the router names one
+}
+```
+
+`SwapErrorCode` is a closed set: `NO_ROUTE`, `UNSUPPORTED_CHAIN`, `UNSUPPORTED_TOKEN`,
+`UNSUPPORTED_RECIPIENT`, `QUOTE_EXPIRED`, `INSUFFICIENT_ALLOWANCE`, `INVALID_SLIPPAGE`,
+`EXECUTION_REVERTED`, `PROVIDER_ERROR`. A consumer can `switch` on it exhaustively.
+`SwapSettlementReport.reason` is a **second, disjoint** closed set — `refunded`,
+`execution-failed`, `not-recognized` — that is never thrown; it only ever arrives as a field on
+a report the consumer already holds. A full cross-chain flow branches on three things, not two:
+`SwapError.code` (caught), `broadcastTransaction`'s untyped `Error` (caught), and
+`SwapSettlementReport.reason` (read off a value).
+
+**Behaviors that don't show up in the signatures above, and that a consumer needs to know:**
 
 - **A quote does not survive an approval.** Confirming an approval routinely takes longer than
   the quote's 30-second window. Whenever `buildSwapApprovalTxs` returns a non-empty list, get a
   **fresh quote** once the approval reaches `approved`, and call `buildSwapTx` with that new
   quote — not the original one. Re-quoting is safe: approvals are unlimited, so a new quote
   never invalidates an allowance already granted. A swap that needs no approval can build
-  straight off its original quote.
-- **Never update a balance before `done`.** `resolveSwapState` reaches `done` only from a
-  receipt reporting successful execution. An unreachable node, a missing receipt, or a
-  reverted swap never produce `done` — don't credit or debit anything until it does.
+  straight off its original quote. This is unchanged for a cross-chain swap: the expiry governs
+  the interval between quoting and signing, and settlement — which happens after signing —
+  never touches the quote again, however long it takes.
+- **Never update a balance before `done` — and what produces `done` differs by swap kind.** For
+  a **same-chain** swap, `resolveSwapState` reaches `done` only from a receipt reporting
+  successful execution of the swap transaction; an unreachable node, a missing receipt, or a
+  reverted swap never produce it. For a **cross-chain** swap, a successful receipt for that same
+  transaction means only that the funds _left_ the origin chain — `done` requires
+  `getSwapSettlement` to report `success`. Concretely: while the origin transaction is
+  unconfirmed, feed `resolveSwapState` its own outcome; once it confirms, stop polling it and
+  switch to feeding the outcome from `getSwapSettlement` instead. A successful origin-transaction
+  outcome must never reach the resolver for a cross-chain swap — doing so reaches `done` while
+  the money is still in flight.
 - **The approval list can hold two transactions.** This happens for tokens (like USDT) that
   revert an `approve` call if the current allowance is non-zero: `buildSwapApprovalTxs` then
   returns `[resetToZero, approveMax]`. Broadcast them **in that order**, and wait for the first
   to confirm before sending the second — they carry sequential nonces on the assumption the
-  first lands before the second is submitted.
-- **A full swap flow surfaces two different error shapes.** `getSwapQuote`,
-  `buildSwapApprovalTxs` and `buildSwapTx` throw `SwapError` (typed, `.code` is exhaustive).
-  Submitting a signed transaction still goes through the existing `broadcastTransaction`,
-  which throws its original, untyped `Error` on failure — that path is unchanged by this
-  feature. Catch both shapes across a full flow.
+  first lands before the second is submitted. Always on the origin chain, cross-chain included.
 - **Slippage is a percentage, not a fraction.** `0.5` means half a percent, not fifty. It's
   optional, defaults to `0.5`, and must be greater than `0` and at most `15` — anything else
   throws `INVALID_SLIPPAGE` before any network call.
+- **A cross-chain quote can only deliver to the address that supplied the input.** Naming a
+  different `toAddress` on a cross-chain request throws `UNSUPPORTED_RECIPIENT` before any
+  network call — deliberately: an address that exists on the origin chain isn't necessarily
+  controllable on the destination chain, and funds delivered to one that isn't are unrecoverable.
+- **Persist the origin transaction hash and both chain IDs once the swap transaction is
+  broadcast.** That's the entire state `getSwapSettlement` needs — no quote, nothing else — so a
+  page reload or app restart can resume reporting settlement with no other memory.
+- **A completed cross-chain swap may deliver less than quoted, or a different token entirely.**
+  Bridging can fall back to handing over the bridged asset itself when the destination-side swap
+  can't be completed. Render `receivedAmount` / `receivedToken` from the settlement report, never
+  the quoted figures — the quote's guaranteed minimum output protects only the origin leg; the
+  destination leg executes minutes later, on another chain, and nothing there can revert a swap
+  transaction that already confirmed.
+- **A refund reports `error` with reason `refunded`, not a partial success.** The input came back
+  on the origin chain instead of being exchanged — nothing was lost beyond fees, and nothing was
+  delivered either.
+- **There is no timeout.** The SDK never declares a transfer dead on elapsed time and publishes
+  no maximum wait — a transfer stuck for hours is reported `pending` for hours, for as long as
+  that stays true upstream. Poll no more than once every 5–10 seconds and back off on
+  `PROVIDER_ERROR`: the routing service is unauthenticated and sustained polling is the one thing
+  in a healthy cross-chain swap likely to hit a rate limit.
+- **`CROSS_CHAIN_NOT_SUPPORTED` no longer exists.** A `case` for it no longer compiles against
+  this version — delete it. `UNSUPPORTED_RECIPIENT` takes its place in the closed set, described
+  above.
+- **A full swap flow surfaces two different error shapes, same-chain or cross-chain.**
+  `getSwapQuote`, `buildSwapApprovalTxs`, `buildSwapTx` and `getSwapSettlement` throw `SwapError`
+  (typed, `.code` is exhaustive). Submitting a signed transaction still goes through the existing
+  `broadcastTransaction`, which throws its original, untyped `Error` on failure — that path is
+  unchanged. Catch both shapes across a full flow.
 
 <!-- Satisfies TR-1 .. TR-23, TFC-1 .. TFC-13 (spec 002-token-registry) -->
 
@@ -247,7 +302,7 @@ interface SwapToken {
 
 All interfaces and type aliases are exported for consumer use:
 
-`BroadcastTransactionOptions`, `BuildMaxNativeTransferTxOptions`, `BuildUnsignedTransferTxOptions`, `BuildBaseUnsignedTransferTxParams`, `EstimateGasLimitFromProviderProps`, `GasEstimateResult`, `EstimateTransactionOptions`, `EstimateTransactionResult`, `PrepareTransactionParams`, `PrepareTransactionResult`, `TxStatusOptions`, `TxStatusResponse`, `FormatAmountOptions`, `TransactionRequest`, `GetBalanceParams`, `GetBalancesParams`, `GetBalancesChainRequest`, `GetBalanceResult`, `ChainBalances`, `TokenBalance`, `ChainGroup`, `NetworkField`, `NetworkId`, `NetworkCategory`, `BasicTokenData`, `BasicTokenSymbol`, `ChainTokenDataMap`, `StablecoinContractData`, `StablecoinContractsByChainId`, `StablecoinSymbol`, `EvmGeneratedWallet`, `EvmDerivedWallet`, `EntropySource`, `SwapState`, `SwapPhase`, `SwapTxOutcome`, `SwapErrorCode`, `SwapTokenInfo`, `SwapRouteSummary`, `LifiTransactionRequest`, `SwapQuote`, `GetSwapQuoteParams`, `BuildSwapApprovalTxsParams`, `BuildSwapTxParams`, `ResolveSwapStateParams`, `SwapToken`, `GetAllSwapTokensParams`, `LegacyTokenData`.
+`BroadcastTransactionOptions`, `BuildMaxNativeTransferTxOptions`, `BuildUnsignedTransferTxOptions`, `BuildBaseUnsignedTransferTxParams`, `EstimateGasLimitFromProviderProps`, `GasEstimateResult`, `EstimateTransactionOptions`, `EstimateTransactionResult`, `PrepareTransactionParams`, `PrepareTransactionResult`, `TxStatusOptions`, `TxStatusResponse`, `FormatAmountOptions`, `TransactionRequest`, `GetBalanceParams`, `GetBalancesParams`, `GetBalancesChainRequest`, `GetBalanceResult`, `ChainBalances`, `TokenBalance`, `ChainGroup`, `NetworkField`, `NetworkId`, `NetworkCategory`, `BasicTokenData`, `BasicTokenSymbol`, `ChainTokenDataMap`, `StablecoinContractData`, `StablecoinContractsByChainId`, `StablecoinSymbol`, `EvmGeneratedWallet`, `EvmDerivedWallet`, `EntropySource`, `SwapState`, `SwapPhase`, `SwapTxOutcome`, `SwapErrorCode`, `SwapTokenInfo`, `SwapRouteSummary`, `LifiTransactionRequest`, `SwapQuote`, `SwapSettlementOutcome`, `SwapSettlementReason`, `SwapSettlementReport`, `GetSwapQuoteParams`, `BuildSwapApprovalTxsParams`, `BuildSwapTxParams`, `ResolveSwapStateParams`, `SwapToken`, `GetAllSwapTokensParams`, `GetSwapSettlementParams`, `LegacyTokenData`.
 
 ## Design notes
 
