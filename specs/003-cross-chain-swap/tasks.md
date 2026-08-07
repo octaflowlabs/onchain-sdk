@@ -406,7 +406,7 @@ cross-chain behaviors list, since it is exactly the kind of thing FC-11/CFC-16's
 branch exhaustively" promise does not cover: there is no error code for it to branch on.
 **Depends on:** T-6
 
-### [ ] T-9 · Release 1.9.0
+### [x] T-9 · Release 1.9.0
 **File:** `package.json`
 **Satisfies:** — · **Plan:** target release, D-9
 
@@ -415,14 +415,19 @@ release note: **`CROSS_CHAIN_NOT_SUPPORTED` is removed from `SwapErrorCode`, and
 `case` for it will not compile.** That note is not optional — it is the entire reason the break is
 acceptable at a minor rather than a major.
 
-Run `yarn prettier`, then `yarn build`, and confirm both ESM and CJS outputs plus declarations before
-publishing. Published manually by the user, per their standing preference.
+Published manually by the user, per their standing preference.
 
-**Verify** `review` — `dist/index.d.ts` exports the full swap surface including
-`getSwapSettlement`; `dist/cjs` builds. After publishing, confirm against the **live registry** that
-`1.9.0` is present *and* that the `latest` dist-tag points at it — 001's T-16 found `latest` stranded
-on `1.0.0-test6` while `next` carried the release, so an unpinned `yarn add` installed the wrong
-package entirely. Check it, do not assume it moved.
+**Gap found and closed, same shape as 001's T-16:** the first check against the live registry showed
+`1.9.0` present but the `latest` dist-tag still pointing at `1.7.0` (`next` correctly at `1.9.0`), so
+an unpinned `yarn add @octaflowlabs/onchain-sdk` would have installed neither this release nor 1.8.0's
+token registry. User ran `npm dist-tag add @octaflowlabs/onchain-sdk@1.9.0 latest`. Re-checked live:
+`{ latest: '1.9.0', next: '1.9.0' }`.
+
+**Verify** `review` — the published tarball (`npm pack @octaflowlabs/onchain-sdk@1.9.0`, extracted, not
+assumed from the local build) confirmed directly: `getSwapSettlement` present in both
+`dist/index.d.ts` and `dist/cjs/index.d.ts`; `SwapErrorCode` carries `UNSUPPORTED_RECIPIENT` and not
+`CROSS_CHAIN_NOT_SUPPORTED`; both ESM and CJS `index.js` present; `package.json` inside the tarball
+reads `1.9.0`. Registry presence and the `latest` dist-tag confirmed live, after the fix above.
 **Depends on:** T-5, T-7, T-8
 
 ---
