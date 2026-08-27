@@ -103,7 +103,7 @@ the bare entry point. All four symbols present in both `dist/index.d.ts` and `di
 
 ## Signing operations
 
-### [ ] T-2 · `signTransactionWithSigner`
+### [x] T-2 · `signTransactionWithSigner`
 
 **Files:** `src/services/evm-wallet-core/externalSigner.ts` (new), `src/index.ts`
 **Satisfies:** ES-3, ES-4, ES-5, ES-6, ES-7, ES-10, ES-14, FC-E1, FC-E2, FC-E3, FC-E4 · **Plan:** D-1, D-2, D-4
@@ -115,7 +115,8 @@ function, not a class; no `AbstractSigner`, no `connect`, no `populateTransactio
 **Three things this task must get right, each of which looks like a detail and is not:**
 
 1. **The ES-14 guard runs first, before `Transaction.from`.** Check `chainId`, `nonce`, `gasLimit`,
-   and that either both 1559 fee fields or `gasPrice` are present; raise
+   and a complete fee specification (see the finding below — a partial 1559 pair does not become
+   complete because `gasPrice` is also set); raise
    `ES_UNRESOLVED_TRANSACTION` naming the missing field(s). It must come first because
    `Transaction.from` does not throw on an under-resolved input — it defaults silently (see the
    measurement table), so after that call the information needed to detect the problem is gone.
@@ -127,29 +128,48 @@ function, not a class; no `AbstractSigner`, no `connect`, no `populateTransactio
    serializer reads whichever the inferred type needs. FC-E3 is satisfied by owning that step, not
    by hand-rolling the arithmetic (OQ-2).
 
-The recovered-address check (ES-7) reads `Transaction.from(serialized).from` and compares it to
-`signer.address` after normalizing both through `getAddress(...)` (D-2), so a caller supplying a
-non-checksummed address is not a spurious mismatch. It runs **before returning**, never after.
+The recovered-address check (ES-7) reads `Transaction.from(serialized).from` — re-parsing the
+**serialized output**, so the round trip is verified, not just the digest that was signed — and
+compares it to `signer.address`. Normalization goes through the SDK's existing
+`normalizeEvmAddress` (`utils/normalizeAddress.ts`) rather than a bare `getAddress` as D-2 sketched:
+it already lowercases and returns `null` instead of throwing, so a malformed `signer.address` lands
+on `ES_SIGNATURE_MISMATCH` rather than escaping as an untyped ethers `INVALID_ARGUMENT`. Reuse, per
+the plan's no-reimplementation rule. It runs **before returning**, never after.
 
 Type is never set by this SDK — `inferType()` decides (ES-4).
 
-**Verify** `pure` — a `Wallet`-backed `ExternalSigner` (`w.signingKey.sign(digest).serialized` in
-ES-1's shape) run through the shipped function and diffed against `w.signTransaction(tx)` for the
-same input, expecting **byte equality** across all three fee shapes in the measurement table.
+**One finding, and it changed ES-14's wording.** The clause as originally written ("either both
+1559 fields or `gasPrice`") has a hole: `maxFeePerGas` + `gasPrice` with **no**
+`maxPriorityFeePerGas` satisfies it literally, but `inferType()` selects **type 2** on the strength
+of the single 1559 field, ignores `gasPrice` completely, and serializes with `maxPriorityFeePerGas`
+encoded as zero — measured directly. That is precisely the silent default ES-14 exists to prevent,
+so the implemented rule is stricter than the literal clause: **one 1559 field without the other is
+incomplete regardless of `gasPrice`.** ES-14 has been reworded to say so; the code and the clause
+agree.
+
+**Verify** `pure` — **29/29 assertions passed**, run from outside the repo tree against the built
+`dist/cjs` (which doubles as the FC-E8 barrel check).
+Byte equality against `signTransaction` — the same private key, the same tx — holds for all three
+fee shapes: 1559-only, `gasPrice`-only, and both-present (`prepareTransaction`'s actual output).
 Byte equality is the assertion, not "parses to the same fields": a broadcast sees only the bytes.
-Separately assert the type actually serialized is 2 / 1 / 2 respectively, so the ES-4 rewording is
-confirmed against shipped code rather than inherited from the design-time note.
-ES-14: one case per missing field (`chainId`, `nonce`, `gasLimit`, fees entirely absent, and
-`maxFeePerGas` present but `maxPriorityFeePerGas` absent) → `ES_UNRESOLVED_TRANSACTION`, with
-`signDigest` wrapped in a counter asserted to be **0** — the guard is worthless if it fires after
-the card has already been tapped.
-ES-7: a signer whose `address` is some other wallet's, with a genuinely valid signature, →
-`ES_SIGNATURE_MISMATCH` and no returned transaction; plus the same signer with a correctly-cased
-and a lowercased `address`, both succeeding (D-2's normalization).
-ES-10: a `signDigest` rejecting with a custom class carrying its own `.code` — assert the caught
-error is `instanceof` that exact class and `.code` survives, not merely that something threw.
-FC-E2: the call counter is exactly `1` on the happy path, and the value passed is a `0x`-prefixed
-66-character string.
+Serialized types confirmed **2 / 1 / 2** against shipped code, so ES-4's rewording is verified here
+and not inherited from the design-time note. `Transaction.from(mine).from` equals the signer in all
+three.
+ES-14: eight cases — missing `chainId`, `nonce`, `gasLimit`; fees entirely absent; `maxFeePerGas`
+without `maxPriorityFeePerGas`; and the hole above (`maxFeePerGas` + `gasPrice`, no
+`maxPriorityFeePerGas`) — each raising `ES_UNRESOLVED_TRANSACTION` with the missing field named in
+`details.missing`, and **`signDigest`'s call counter asserted `0`** every time. A guard that fires
+after the card has been tapped is worthless, so the counter is the real assertion.
+ES-7: a signer whose `address` is a second wallet's, answering with a genuinely valid signature, →
+`ES_SIGNATURE_MISMATCH`, not narrowable as a `SwapError`, counter at `1` (the signer _did_ answer —
+this is the case ES-11 exists to distinguish). Accepted without spurious mismatch: checksummed,
+all-lowercase, `0x`+all-uppercase, and whitespace-padded addresses. Rejected as
+`ES_SIGNATURE_MISMATCH` rather than as an untyped throw: `'bad'`, `''`, `'0x123'`, `null`,
+`undefined`.
+ES-10: a `signDigest` rejecting with a `CryptnoxCardError`-shaped class — the caught value is
+asserted to be the **same instance** (`e === boom`), `instanceof` that exact class, `.code` intact,
+and **not** an `ExternalSignerError`. Identity, not just "something threw".
+FC-E2: counter exactly `1` on every happy path, and every digest passed matches `/^0x[0-9a-f]{64}$/`.
 **Depends on:** T-1
 
 ### [ ] T-3 · `signMessageWithSigner`

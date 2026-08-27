@@ -78,10 +78,14 @@ string) => Promise<string> }`, where `digest` is a `0x`-prefixed 32-byte hex str
   No signed transaction is ever returned to a caller signed by a key other than the one it asked
   for.
 - **ES-14** — Before computing the signing digest, THE SDK SHALL verify `tx` carries `chainId`,
-  `nonce`, `gasLimit`, and either both `maxFeePerGas`/`maxPriorityFeePerGas` or `gasPrice` — the
-  fields ES-3 assumes a caller who used `prepareTransaction` already supplied. IF any of these is
-  missing, THEN THE SDK SHALL raise `ES_UNRESOLVED_TRANSACTION`, naming the missing field(s), and
-  SHALL NOT call `signDigest`. _(Resolves OQ-3.)_
+  `nonce`, `gasLimit`, and a complete fee specification — the fields ES-3 assumes a caller who used
+  `prepareTransaction` already supplied. A fee specification is complete when **both**
+  `maxFeePerGas` and `maxPriorityFeePerGas` are present, or when `gasPrice` is present and neither
+  1559 field is. **One 1559 field without the other is incomplete even when `gasPrice` is also
+  present**, because `inferType()` selects type 2 on the strength of the single 1559 field, ignores
+  `gasPrice` entirely, and encodes the absent field as zero (measured — see T-2). IF the
+  specification is incomplete, THEN THE SDK SHALL raise `ES_UNRESOLVED_TRANSACTION`, naming the
+  missing field(s), and SHALL NOT call `signDigest`. _(Resolves OQ-3.)_
 
 ### Message signing
 
