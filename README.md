@@ -65,6 +65,78 @@ import {
 | `signMessage`      | `(privateKey: string, message: string) => Promise<string>`                         | Sign an arbitrary message.                                                                                                                                                         |
 | `signTransaction`  | `(privateKey: string, tx: TransactionRequest, rpcUrl?: string) => Promise<string>` | Sign a transaction and return the serialized signed payload.                                                                                                                       |
 
+<!-- Satisfies FC-E1, FC-E2, FC-E3, FC-E4, FC-E5, FC-E6, FC-E7, FC-E8, ES-1, ES-11, ES-12, ES-14 (spec 004-external-signer) -->
+
+#### External signers
+
+For a signer whose private key never leaves the hardware holding it — a Cryptnox NFC card, a Secure
+Enclave key, a hardware wallet — supply an **`ExternalSigner`** instead of a private key. Everything
+between "here is a transaction" and "here is a digest" is identical to the private-key path; only
+who computes the signature changes.
+
+| Export                      | Signature                                                                              | Description                                                                                 |
+| --------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `signTransactionWithSigner` | `(signer: ExternalSigner, tx: TransactionRequest, rpcUrl?: string) => Promise<string>` | Sign a prepared transaction with an external signer. Returns the serialized signed payload. |
+| `signMessageWithSigner`     | `(signer: ExternalSigner, message: string) => Promise<string>`                         | Sign an arbitrary message with an external signer, using the same EIP-191 prefixing.        |
+| `ExternalSignerError`       | `class`                                                                                | Typed error for this path. Narrow it with `isExternalSignerError`.                          |
+| `isExternalSignerError`     | `(e: unknown) => e is ExternalSignerError`                                             | Type guard. Returns `false` for a `SwapError`, and `isSwapError` returns `false` here.      |
+
+**The contract you implement.** `ExternalSigner` is the whole interface — two members, no private
+key anywhere in it:
+
+```ts
+type ExternalSigner = {
+  address: string
+  signDigest: (digest: string) => Promise<string>
+}
+```
+
+`signDigest` receives a `0x`-prefixed **32-byte** hex digest and nothing else — there is nothing to
+parse, unwrap or re-hash. It must resolve a `0x`-prefixed **65-byte** hex signature, `r ‖ s ‖ v`,
+with `v ∈ {27, 28}`. The SDK converts `v` to `yParity` for typed transactions itself; do not do it
+in your signer. Each operation calls `signDigest` **exactly once**.
+
+**Transactions must already be resolved.** `signTransactionWithSigner` does not fetch a nonce, chain
+id or gas — pass `prepareTransaction`'s output, exactly as you would to `signTransaction`. If a
+required field is missing it raises `ES_UNRESOLVED_TRANSACTION` **before** calling `signDigest`,
+rather than letting ethers silently default it to zero. `prepareTransaction`'s `from` is validated
+against `signer.address` and then dropped, the same two steps `signTransaction` performs — so the
+prepared transaction is passed through unmodified:
+
+```ts
+const { unsignedTx } = await prepareTransaction({ rpcUrl, chainId, tx, fromAddress })
+const signed = await signTransactionWithSigner(signer, unsignedTx)
+const hash = await broadcastTransaction({ rpcUrl, signedTx: signed })
+```
+
+**Two failures, and they mean different things.**
+
+```ts
+try {
+  await signTransactionWithSigner(signer, unsignedTx)
+} catch (e) {
+  if (isExternalSignerError(e)) {
+    // ES_SIGNATURE_MISMATCH       — the signer answered, but with the wrong key
+    // ES_UNRESOLVED_TRANSACTION   — the tx was missing a field; signDigest was never called
+    // ES_SIGNER_ADDRESS_MISMATCH  — tx.from is not this signer's account; not called either
+  } else {
+    // your signer's own error, thrown by signDigest and passed through untouched
+  }
+}
+```
+
+Anything `signDigest` throws propagates **unchanged** — same instance, same class, same `.code`. A
+classified NFC or Secure Enclave failure arrives at your `catch` exactly as your signer threw it, so
+classify it by its own type rather than by matching on message strings. `ES_SIGNATURE_MISMATCH` is
+the SDK's own error and is raised only after the signature is checked against `signer.address` by
+recovery, so a transaction signed by an unexpected key is never returned to you.
+
+`ExternalSignerError` is **not** a `SwapError` and neither extends the other: `isSwapError` and
+`isExternalSignerError` never both hold, so each narrows independently.
+
+**Nothing about the private-key path changed.** `createWallet`, `signMessage` and `signTransaction`
+are untouched; a consumer already using them needs no edit.
+
 ### Utilities
 
 | Export                               | Signature                                                  | Description                                                                                                                   |

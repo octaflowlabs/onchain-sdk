@@ -69,9 +69,10 @@ a shared base class** (D-3): `isSwapError(e)` must stay `false` for an `External
 vice versa, so a consumer's `catch` cannot narrow onto the wrong one. The four-line duplication is
 deliberate.
 
-`ExternalSignerErrorCode` is a closed set of two: `'ES_SIGNATURE_MISMATCH'`,
-`'ES_UNRESOLVED_TRANSACTION'`. Both are raised by later tasks; both are declared here so the set is
-defined in one place.
+`ExternalSignerErrorCode` is a closed set of three: `'ES_SIGNATURE_MISMATCH'`,
+`'ES_UNRESOLVED_TRANSACTION'`, `'ES_SIGNER_ADDRESS_MISMATCH'`. All are raised by later tasks; all
+are declared here so the set is defined in one place. _(The third was added during T-8, when the
+`from`-field defect below forced clause ES-15 — the set was two when this task first closed.)_
 
 `ExternalSignerErrorCode` lives in `ExternalSignerError.ts`, not in `types/`. This **departs from
 where `SwapErrorCode` sits** (`types/swap.ts`, imported by `SwapError.ts`) and follows T-6's export
@@ -147,8 +148,30 @@ so the implemented rule is stricter than the literal clause: **one 1559 field wi
 incomplete regardless of `gasPrice`.** ES-14 has been reworded to say so; the code and the clause
 agree.
 
-**Verify** `pure` — **29/29 assertions passed**, run from outside the repo tree against the built
-`dist/cjs` (which doubles as the FC-E8 barrel check).
+**A defect this task's own verification missed, caught by T-8 — the most important entry in this
+file.** Every fixture here hand-built its `tx`. `prepareTransaction` **always sets `from`**
+([prepareTransaction.ts:30](../../src/blockchain/prepareTransaction.ts#L30)), and
+`ethers.Transaction.from` throws `unsigned transaction cannot define '.from'` when it is present.
+So `signTransactionWithSigner` was **incapable of signing a real `prepareTransaction` output** —
+the exact input ES-3 promises to accept — while passing 29/29 locally. The first line of the T-8
+harness that used the real function together with the real preparer failed immediately.
+
+`ethers.Wallet.signTransaction` handles this in two steps this implementation had not mirrored
+([base-wallet.js:67-70](../../node_modules/ethers/lib.commonjs/wallet/base-wallet.js#L67-L70)):
+assert `getAddress(tx.from) === this.address`, then `delete tx.from`. Since FC-E1 says "by the same
+rules as `signTransaction`", mirroring both steps is required by the existing contract, not an
+addition to it. The typed error for the assert half had no code in the closed set, so clause
+**ES-15** and `ES_SIGNER_ADDRESS_MISMATCH` were added — the same pattern ES-14 followed.
+The lesson is the one this file already states in its own header and failed to apply: a fixture
+that constructs its input by hand cannot verify a clause whose subject is _another function's
+output_. Fixtures now cover `from`, but T-8 is what actually proves ES-3.
+
+**Verify** `pure` — **36/36 assertions passed**, run from outside the repo tree against the built
+`dist/cjs` (which doubles as the FC-E8 barrel check). Seven of the 36 are the ES-15 cases added
+after the defect: `from` matching the signer is accepted and produces output identical to the same
+tx without `from`; a lowercased `from` is accepted; a different wallet's address, `'nope'` and `''`
+each raise `ES_SIGNER_ADDRESS_MISMATCH` with the signer's call counter at `0`; and the caller's `tx`
+object is confirmed not mutated (the strip is done on a copy).
 Byte equality against `signTransaction` — the same private key, the same tx — holds for all three
 fee shapes: 1559-only, `gasPrice`-only, and both-present (`prepareTransaction`'s actual output).
 Byte equality is the assertion, not "parses to the same fields": a broadcast sees only the bytes.
@@ -218,7 +241,7 @@ sites, one per operation. Both operations resolve from the bare entry point;
 
 ## Audits
 
-### [ ] T-4 · Prove the private-key path is untouched
+### [x] T-4 · Prove the private-key path is untouched
 
 **Files:** none (audit)
 **Satisfies:** ES-12, ES-13 · **Plan:** D-1
@@ -236,13 +259,33 @@ private helper out of `Wallet.signTransaction` is impossible anyway, since that 
 ethers. What ES-13 forbids is the new file hand-rolling a _second_ digest computation; that it does
 not is what gets confirmed.
 
-**Verify** `review` — the `signer.ts` diff is empty by exit code. `grep -nE "0x19|Ethereum Signed
-Message|serializeTransaction|rlp|RLP" src/services/evm-wallet-core/externalSigner.ts` returns
-nothing — no hand-rolled prefixing, no hand-rolled encoding. The only hashing call in the new file
-is `keccak256(...unsignedSerialized)` and the only message-digest call is `hashMessage`.
+**Note on the diff base.** By the time this ran, the work had been committed to a branch
+(`feat/external-signer`, four commits) rather than sitting uncommitted on `main`, so
+`git diff main...HEAD` is a real branch-vs-main comparison. That is a **stronger** base than 003's
+T-5 had — that task found `main` lagging at 1.7.0 and had to fall back to the published tarball to
+prove anything. Both bases were used here anyway.
+
+**Verify** `review` — **ES-12 confirmed at three levels, all clean.**
+Source: `git diff main...HEAD -- src/services/evm-wallet-core/signer.ts` is empty by exit code (0
+lines). The feature's entire source footprint is three new files plus `src/index.ts`; the barrel's
+diff is **purely additive** — 14 added lines, zero removed, confirmed by grepping the diff for `-`
+lines and finding none.
+Built declarations: `createWallet`, `signMessage` and `signTransaction` keep their exact signatures
+in `dist/services/evm-wallet-core/signer.d.ts`.
+Published package: `npm pack @octaflowlabs/onchain-sdk@1.9.0`, extracted, and `signer.d.ts` and
+`signer.js` both **byte-identical** to this branch's build — not assumed from the local build, per
+003's T-5 discipline. Across the whole 180-file `dist` tree, exactly **4** pre-existing files
+differ, and all four are the barrel (`index.js`/`index.d.ts` in both ESM and CJS). Everything else
+this feature adds is new; **nothing was removed** (no file present in the published tarball is
+missing from this build).
+ES-13: with block comments stripped, `grep -nE "0x19|Ethereum Signed Message|serializeTransaction|
+rlp|RLP|toUtf8Bytes|concat"` over the new file returns nothing — no hand-rolled prefixing, no
+hand-rolled encoding. The file contains exactly two digest computations,
+`keccak256(populated.unsignedSerialized)` and `hashMessage(message)`, one per operation, and exactly
+two `signDigest` call sites.
 **Depends on:** T-2, T-3
 
-### [ ] T-5 · Prove no private key and no error wrapping
+### [x] T-5 · Prove no private key and no error wrapping
 
 **Files:** none (audit)
 **Satisfies:** ES-2, ES-10, FC-E5, FC-E6 · **Plan:** D-4
@@ -257,17 +300,32 @@ either still produces a correctly signed transaction, so no happy-path test can 
 - **ES-10 / FC-E6** — no `try`/`catch` surrounding the `signDigest` call, and no `throw` in the new
   file other than the two `ExternalSignerError` raises.
 
-**Verify** `review` — `grep -nE "privateKey|new Wallet|SigningKey|Mnemonic|HDNodeWallet|createWallet"`
-against `src/services/evm-wallet-core/externalSigner.ts` returns nothing; the file's ethers import
-line is inspected directly and contains none of them. `grep -nE "try|catch"` returns nothing.
-`grep -nE "throw " ` returns exactly two hits, both `ExternalSignerError`.
-`pure` — the empirical half, since grep only proves the current text: a signer whose `signDigest`
-rejects is confirmed (as in T-2, re-asserted here as the clause's own check) to surface the original
-class instance, and the `ExternalSigner` object passed in is asserted to still have exactly two own
-properties afterwards — nothing was read off it or attached to it.
+**Verify** `review` — every grep run over the file with **block comments stripped first**, since the
+traceability header legitimately contains the words `private key` and `try/catch` and would
+otherwise produce false hits that hide a real one.
+`privateKey|private key|new Wallet|Wallet(|SigningKey|Mnemonic|HDNode|createWallet|mnemonic|seed|
+entropy` → **none**. `try|catch|finally|.catch(` → **none**. `throw ` → exactly **two**, both
+`new ExternalSignerError(`. The ethers import line read directly:
+`{ Transaction, Signature, keccak256, hashMessage, verifyMessage }` — nothing key-bearing.
+Extended beyond the task's original scope to the **transitive** path, since ES-2 says "anywhere on
+the path": the same grep over `utils/normalizeAddress.ts`, `signing/ExternalSignerError.ts`,
+`types/externalSigner.ts` and `types/common.ts` returns 0 hits each.
+
+`pure` — **29/29 assertions passed.** Grep only proves the current text, so the empirical half was
+made stronger than written: the signer is passed in wrapped in a **`Proxy` that records every
+property read off it**, with decoy `privateKey` and `_secret` members present on the target. Both
+operations read exactly `["address", "signDigest"]` and nothing else — this catches a
+`signer.privateKey` probe that no grep of _this_ repo would see, because the read would happen here
+against an object the caller owns. Neither operation mutates the signer.
+A signer with no key material at all completes both operations, and still has exactly two own
+properties afterwards (nothing attached).
+Rejection identity asserted for **both** operations, not just the transaction one: same instance
+(`e === boom`), `instanceof` the original class, `.code` intact, `.stack` not rewritten, and not an
+`ExternalSignerError`. Also confirmed for **non-`Error` rejections** — a string, a plain object, a
+number and `null` each come back via `Object.is`, so nothing is coerced or wrapped on the way out.
 **Depends on:** T-2, T-3
 
-### [ ] T-6 · Audit the public export surface
+### [x] T-6 · Audit the public export surface
 
 **File:** `src/index.ts`
 **Satisfies:** FC-E8 · **Plan:** where this lives
@@ -285,18 +343,43 @@ FC-E8 says "importable from the package entry point **and from nowhere else**" �
 CLAUDE.md forbids deep imports, so the check is that the barrel is sufficient, not that deep paths
 are physically blocked.
 
-**Verify** `review` — the six symbols cross-checked against `src/index.ts` and the built
-`dist/index.d.ts`. Then, as 001's T-12 and 003's T-6 did, **import the built package from outside
-the repo tree** — a `node -e` run from the scratch directory, not this one — exactly as a consumer
-would, confirming all six resolve from the bare entry point. `grep -n "export \*" src/index.ts`
-returns nothing (the barrel stays explicit).
+**No edits were needed**, as in 001's T-12 and 003's T-6: T-1, T-2 and T-3 each exported their own
+symbols under the standing rule, so this task is a confirmation, not a batch of fixes. `src/index.ts`
+carries no JSDoc traceability header of its own — it never has, in 001, 002 or 003 — so there is
+none to add here; the convention puts the block on the file that _defines_ a symbol, not the one
+that re-exports it.
+
+**Verify** `review` — **25/25 assertions passed**, run from outside the repo tree, resolving the
+package through its own `package.json` `main` rather than a hand-written path, exactly as a
+consumer's resolver would. All four runtime values (`signTransactionWithSigner`,
+`signMessageWithSigner`, `ExternalSignerError`, `isExternalSignerError`) are functions off the bare
+entry point, and both operations round-trip a real signature through it. All six symbols are
+declared in **both** `dist/index.d.ts` and `dist/cjs/index.d.ts`, and all four value exports appear
+in the ESM half too. `grep "export \*"` and `grep "internal/"` over `src/index.ts` both return
+nothing — the barrel stays explicit. `assertRecoveredAddress`, `assertResolvedTransaction` and
+`isPresent` are `undefined` on the barrel: the module-private helpers stayed private.
+
+**One finding, pre-existing, out of scope, and narrower than it first looked.** The ESM build emits
+**extensionless relative imports** (`import ... from './ABIs/ERC20_TOKEN_CONTRACT_ABI'`), which
+Node's native ESM resolver rejects with `ERR_MODULE_NOT_FOUND`. Verified **not** caused by this
+feature: the extracted `1.9.0` tarball has byte-identical extensionless imports.
+
+**It does not affect normal consumption, and an earlier draft of this note wrongly said it did.**
+`package.json` has no `exports` map, so Node resolves a bare `import '@octaflowlabs/onchain-sdk'`
+through `main` — the **CJS** build — and imports it fine from an ESM caller via named-export
+detection. Confirmed directly from an ESM package with the SDK symlinked: all three checked symbols
+resolve. Node ignores the `module` field entirely. The failure only occurs on a **deep path**
+(`import '.../dist/index.js'`), which FC-E8 forbids anyway and which is what the probe that surfaced
+this was doing. Bundlers that do honour `module` (Metro, webpack, Vite) resolve extensionless
+specifiers themselves. Worth fixing eventually via `.js` extensions or an `exports` map; not urgent,
+and not 004's.
 **Depends on:** T-4, T-5
 
 ---
 
 ## Integration
 
-### [ ] T-7 · Document the public surface
+### [x] T-7 · Document the public surface
 
 **File:** `README.md`
 **Satisfies:** FC-E1 – FC-E8 · **Plan:** where this lives
@@ -322,12 +405,27 @@ artifact and may have drifted from what shipped, the discipline 001's T-14 estab
 exactly that. An HTML comment citing the clause ids sits at the top of the new subsection, per
 CLAUDE.md's traceability exception.
 
-**Verify** `review` — every signature in the section diffed against the corresponding `dist/*.d.ts`.
-Each of the five call-outs confirmed present by an individual grep. `yarn prettier --check README.md`
-and `yarn build` both clean.
+Placed as a `####` subsection **inside** `### Wallet and signing`, immediately after that section's
+table, rather than as a sibling `###` — a consumer reading about signing meets the hardware-backed
+path in the same place as the private-key one, which is the point.
+
+**Verify** `review` — all three signatures (`signTransactionWithSigner`, `signMessageWithSigner`,
+`isExternalSignerError`) matched **character-for-character** against
+`dist/services/evm-wallet-core/externalSigner.d.ts` and `dist/signing/ExternalSignerError.d.ts`, not
+against plan.md. Seven call-outs confirmed present by individual grep — the five the task required
+plus FC-E2's "exactly once" and FC-E3's `yParity` ownership. Traceability comment sits above the
+subsection. `yarn prettier --check README.md` and `yarn build` both clean.
+
+**The documented examples are compiled, not just read.** Both code blocks were extracted into a
+scratch `.ts` inside `src/`, imported through the barrel exactly as written, and type-checked under
+`tsc -p tsconfig.json --noEmit --strict` — clean, then deleted. This caught nothing this time, but
+it is the only way to know a README example is real: the `prepareTransaction({ rpcUrl, chainId, tx,
+fromAddress })` → `{ unsignedTx }` → `signTransactionWithSigner` → `broadcastTransaction({ rpcUrl,
+signedTx })` chain is confirmed to typecheck against the shipped declarations, parameter shapes
+included. A prose-only check would have accepted a wrong destructuring silently.
 **Depends on:** T-6
 
-### [ ] T-8 · On-chain verification run
+### [x] T-8 · On-chain verification run
 
 **Files:** none (records land in this file)
 **Satisfies:** ES-3, ES-6, ES-7, ES-14, FC-E1, FC-E4 end to end
@@ -339,15 +437,55 @@ nothing about whether a node accepts the result, which is the claim FC-E1 actual
 
 Run from the `wallet-broadcasting` test repo against a symlinked build, as 001–003 did. Scenarios:
 
-| #   | Scenario                                                                                                                         | Cost |
-| --- | -------------------------------------------------------------------------------------------------------------------------------- | ---- |
-| 1   | `prepareTransaction` → `signTransactionWithSigner` (Wallet-backed) → `broadcastTransaction`, native transfer on a low-cost chain | gas  |
-| 2   | the same prepared tx signed both ways, bytes compared before either is broadcast                                                 | none |
-| 3   | `signMessageWithSigner` → `verifyMessage` recovers the signer's address                                                          | none |
-| 4   | a hand-built `tx` missing `chainId` → `ES_UNRESOLVED_TRANSACTION`, nothing broadcast                                             | none |
-| 5   | signer whose `address` is a different wallet → `ES_SIGNATURE_MISMATCH`, nothing broadcast                                        | none |
+| #   | Scenario                                                                                                                         | Cost | Result                                                           |
+| --- | -------------------------------------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------- |
+| 1   | `prepareTransaction` → `signTransactionWithSigner` (Wallet-backed) → `broadcastTransaction`, native transfer on a low-cost chain | gas  | **passed** — Polygon, block 92776153, type 2, `success` at t+3s  |
+| 2   | the same prepared tx signed both ways, bytes compared before either is broadcast                                                 | none | **passed** — byte-identical, type 2, one `signDigest` call       |
+| 3   | `signMessageWithSigner` → `verifyMessage` recovers the signer's address                                                          | none | **passed** — recovers to signer, byte-identical to `signMessage` |
+| 4   | a `tx` missing `chainId` → `ES_UNRESOLVED_TRANSACTION`, nothing broadcast                                                        | none | **passed** — `details.missing: ["chainId"]`, counter `0`         |
+| 5   | signature recovers to a different address → `ES_SIGNATURE_MISMATCH`, nothing broadcast                                           | none | **passed** — counter `1` (the signer answered)                   |
+| 6   | `tx.from` disagrees with `signer.address` → `ES_SIGNER_ADDRESS_MISMATCH`                                                         | none | **passed** — counter `0` (caught before tapping)                 |
+| 7   | `prepareTransaction`'s output signed unmodified, `from` and all                                                                  | none | **passed** — the regression case for the ES-15 defect            |
 
 Only scenario 1 spends. Record the real tx hash, the chain, and the inferred type.
+
+**Scenario 1, the only claim no local test can make — FC-E1's "`broadcastTransaction` accepts
+unchanged" — is now confirmed on Polygon mainnet:**
+
+|                |                                                                      |
+| -------------- | -------------------------------------------------------------------- |
+| tx hash        | `0xbd161d54c133208da41dccfc8f87bd192e31eff1da74050f516e2c4adb68b1f3` |
+| chain / block  | 137 / 92776153                                                       |
+| type           | **2** (EIP-1559), as ES-4 predicts for `prepareTransaction`'s output |
+| from / nonce   | `0x869B99a2E06B108E993e6e54876a81e5D0291c10` / 0                     |
+| gas used / fee | 21000 / 0.006312128765229 POL                                        |
+| settled        | `success` at t+3s, first poll                                        |
+
+**Verified from a different RPC than the one that broadcast it** (`polygon.publicnode.com`, against
+a broadcast through `poly.api.pocket.network`), so the confirmation does not depend on the node that
+accepted it: receipt `status: 1`, `tx.from` equal to the signer's address, `tx.type: 2`, sender nonce
+advanced 0 → 1. **A node accepted bytes produced by a signer that never held a private key** — every
+other check in this spec is local and could not have established that.
+
+**Two infrastructure notes from the run, neither a code defect.** The first attempt failed at
+`broadcastTransaction` with HTTP 429 `rate limit exceeded` from `polygon.gateway.tenderly.co`; the
+signing half had already completed correctly (one `signDigest` call, type 2, recovered address
+matching). Confirmed nothing was spent before retrying — sender nonce still `0`, balance unchanged,
+tx hash absent from chain — then re-ran against a different RPC. Retrying was safe regardless: the
+signed bytes for a given nonce are deterministic, so a re-broadcast either lands the same hash or is
+rejected as already known. Separately, `wallet-broadcasting`'s `settings.ts` falls back to a
+**Sepolia** URL for chain `137` when `RPC_URL_POLYGON` is unset — harmless here since the variable
+was set, but it would silently prepare against the wrong network.
+
+**Scenarios 5 and 6 had to be split, and the reason is worth recording.** Scenario 5 as originally
+written used `prepareTransaction`'s output unmodified with an impostor `signer.address` — which now
+raises `ES_SIGNER_ADDRESS_MISMATCH` at the ES-15 guard, **before** `signDigest`, so ES-7 was never
+reached and the scenario silently stopped testing what it named. It now deletes `from` first so the
+signature check is what fires, and scenario 6 covers ES-15 on its own. A scenario that passes for
+the wrong reason is worse than one that fails.
+
+The harness lives at `scratchpad/t8-externalSigner.js` (ESM — `wallet-broadcasting` is
+`type: module`); one exported function per scenario, one invoked per run, per 003's T-8 format.
 
 **Note for whoever runs this:** every chain in `NETWORKS_REGISTRY` is EIP-1559-capable and
 `prepareTransaction` always populates the type-2 fee fields, so scenario 1 exercises **type 2 only**.
@@ -355,9 +493,17 @@ Type 1 and type 0 are unreachable through the normal flow (OQ-1) and are covered
 check alone. Do not hand-craft a `gasPrice`-only transaction here just to reach type 1 — it would be
 a transaction no consumer of this SDK can actually produce.
 
-**Verify** `chain` — scenario 1 confirmed by a real hash reaching `success` via `txStatus`, with the
-recovered `from` equal to the signer's address on the mined transaction. Scenarios 2–5 recorded with
-their results in this file, in 003's T-8 format.
+**Verify** `chain` — **7/7 scenarios passed**, all recorded in the table above. Scenario 1 confirmed
+by a real hash reaching `success` via `txStatus` and then re-checked from an independent RPC:
+receipt `status: 1`, `tx.type: 2`, `tx.from` equal to the signer's address on the mined transaction,
+sender nonce advanced 0 → 1. Scenarios 2–7 ran against the same live chain and preparer, with
+`signDigest`'s call counter asserted on every one (`1` where the signer should answer, `0` where a
+guard must fire first).
+
+**This task earned its place.** It found the ES-3/`from` defect that 29 local assertions in T-2 had
+missed, which forced clause ES-15 and a third error code — and scenarios 5 and 6 had to be split
+afterwards because the new guard silently preempted the one scenario 5 was named for. Both are
+recorded in T-2 and above.
 **Depends on:** T-6
 
 ### [ ] T-9 · Release 1.10.0

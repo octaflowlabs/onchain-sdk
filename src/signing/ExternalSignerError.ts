@@ -6,6 +6,7 @@
  *  - ES-11  ES_SIGNATURE_MISMATCH is the SDK's own error, distinguishable from anything
  *           signDigest can throw
  *  - ES-14  ES_UNRESOLVED_TRANSACTION is raised when tx lacks a field ES-3 assumes resolved
+ *  - ES-15  ES_SIGNER_ADDRESS_MISMATCH is raised when tx.from is not the signer's address
  *  - FC-E4  a distinguishable error, rather than a transaction signed by an unexpected key
  *  - FC-E8  importable from the package entry point
  *
@@ -13,7 +14,10 @@
  * isSwapError and isExternalSignerError never both hold for the same value.
  */
 
-export type ExternalSignerErrorCode = 'ES_SIGNATURE_MISMATCH' | 'ES_UNRESOLVED_TRANSACTION'
+export type ExternalSignerErrorCode =
+  | 'ES_SIGNATURE_MISMATCH'
+  | 'ES_UNRESOLVED_TRANSACTION'
+  | 'ES_SIGNER_ADDRESS_MISMATCH'
 
 export class ExternalSignerError extends Error {
   readonly code: ExternalSignerErrorCode

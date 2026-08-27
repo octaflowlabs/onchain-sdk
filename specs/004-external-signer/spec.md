@@ -86,6 +86,15 @@ string) => Promise<string> }`, where `digest` is a `0x`-prefixed 32-byte hex str
   `gasPrice` entirely, and encodes the absent field as zero (measured — see T-2). IF the
   specification is incomplete, THEN THE SDK SHALL raise `ES_UNRESOLVED_TRANSACTION`, naming the
   missing field(s), and SHALL NOT call `signDigest`. _(Resolves OQ-3.)_
+- **ES-15** — WHEN `tx` carries a `from` field — which `prepareTransaction`'s output always does —
+  THE SDK SHALL validate it against `signer.address` and strip it before serializing, the same two
+  steps `ethers.Wallet.signTransaction` performs internally (`assertArgument(getAddress(tx.from)
+=== this.address)` then `delete tx.from`). `ethers.Transaction.from` rejects a transaction that
+  defines `from`, so without this ES-3 cannot hold. IF `from` is present and does not
+  case-insensitively equal `signer.address`, THEN THE SDK SHALL raise
+  `ES_SIGNER_ADDRESS_MISMATCH` and SHALL NOT call `signDigest`. This is distinct from ES-7: it is
+  detected **before** the signer is asked, and means "you asked for a transaction from an account
+  this signer does not hold," not "the signer answered with the wrong key."
 
 ### Message signing
 

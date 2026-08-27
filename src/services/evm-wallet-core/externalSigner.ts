@@ -3,7 +3,9 @@
  *
  * Satisfies:
  *  - ES-3   accepts the same already-resolved TransactionRequest shape signTransaction accepts,
- *           in particular prepareTransaction's output; resolves nothing itself
+ *           in particular prepareTransaction's output — which carries `from`; resolves nothing
+ *  - ES-15  `from` is validated against signer.address and stripped before serializing, the same
+ *           two steps Wallet.signTransaction performs; ES_SIGNER_ADDRESS_MISMATCH if they differ
  *  - ES-4   transaction type is whatever ethers' own inferType() decides; never set here
  *  - ES-5   the signing digest is computed here, from the resolved TransactionRequest, and is
  *           exactly what signDigest receives
@@ -80,6 +82,24 @@ const assertRecoveredAddress = (
     )
 }
 
+const withoutFrom = (tx: TransactionRequest, signer: ExternalSigner): TransactionRequest => {
+  if (!isPresent(tx.from)) return tx
+
+  const declared = normalizeEvmAddress(tx.from as string)
+  const expected = normalizeEvmAddress(signer.address)
+
+  if (!declared || !expected || declared !== expected)
+    throw new ExternalSignerError(
+      'ES_SIGNER_ADDRESS_MISMATCH',
+      'tx.from is not the signer address',
+      { from: tx.from, signerAddress: signer.address },
+    )
+
+  const stripped = { ...tx }
+  delete stripped.from
+  return stripped
+}
+
 export const signTransactionWithSigner = async (
   signer: ExternalSigner,
   tx: TransactionRequest,
@@ -87,7 +107,8 @@ export const signTransactionWithSigner = async (
 ): Promise<string> => {
   assertResolvedTransaction(tx)
 
-  const populated = Transaction.from(tx as Parameters<typeof Transaction.from>[0])
+  const signable = withoutFrom(tx, signer)
+  const populated = Transaction.from(signable as Parameters<typeof Transaction.from>[0])
   const digest = keccak256(populated.unsignedSerialized)
 
   const signature = await signer.signDigest(digest)
