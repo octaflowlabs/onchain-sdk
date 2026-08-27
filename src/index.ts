@@ -57,6 +57,20 @@ export {
 export { EntropySource } from './services/evm-wallet-core/entropy'
 export { createWallet, signMessage, signTransaction } from './services/evm-wallet-core/signer'
 
+/** external signer exports */
+export {
+  signTransactionWithSigner,
+  signMessageWithSigner,
+} from './services/evm-wallet-core/externalSigner'
+export {
+  ExternalSignerError,
+  isExternalSignerError,
+  ExternalSignerErrorCode,
+} from './signing/ExternalSignerError'
+
+/** external signer types exports */
+export { ExternalSigner } from './types/externalSigner'
+
 /** utils exports */
 export { getShortenTransactionHashOrAddress, getShortenData } from './utils/getShortenTxHash'
 export { transformBigInt } from './utils/transformBigInt'

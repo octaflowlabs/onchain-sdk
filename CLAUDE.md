@@ -2,10 +2,18 @@
 
 - Package manager is yarn, not npm.
 - Monetary amounts are always `bigint`, never `number`, at any
-  boundary — see spec.md SDK-1/SDK-2.
-- Every thrown domain error extends `SwapError` with a code from
-  the closed set in spec.md — never throw a plain `Error` for an
-  anticipated failure.
+  boundary — see 001's SDK-1/SDK-2.
+- Every thrown domain error extends its own spec's error class —
+  never a plain `Error` for an anticipated failure — with a code
+  from that spec's closed set. Each spec owns both:
+  `SwapError`/`SwapErrorCode` (001, `swap/SwapError.ts`),
+  `ExternalSignerError`/`ExternalSignerErrorCode`
+  (004, `signing/ExternalSignerError.ts`).
+- Those error classes are siblings, never subclasses of one
+  another, so each narrows independently: `isSwapError` stays
+  false for an `ExternalSignerError`, and vice versa. A new spec
+  with its own failures adds a class and a type guard — it does
+  not extend an existing one.
 - Run `yarn prettier` and `yarn build` before considering any task done.
 - Do NOT add explanatory comments to code (no "// this validates X",
   no JSDoc-style descriptions of what a function does).
