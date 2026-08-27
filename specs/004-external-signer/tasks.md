@@ -172,7 +172,7 @@ and **not** an `ExternalSignerError`. Identity, not just "something threw".
 FC-E2: counter exactly `1` on every happy path, and every digest passed matches `/^0x[0-9a-f]{64}$/`.
 **Depends on:** T-1
 
-### [ ] T-3 · `signMessageWithSigner`
+### [x] T-3 · `signMessageWithSigner`
 
 **Files:** `src/services/evm-wallet-core/externalSigner.ts`, `src/index.ts`
 **Satisfies:** ES-8, ES-9, ES-10, FC-E2, FC-E7 · **Plan:** D-1, D-2, D-4
@@ -185,12 +185,33 @@ ES-9 applies ES-7's check here too, under the same code, but recovery goes throu
 `verifyMessage(message, signature)` rather than `Transaction.from` (D-2). Same normalization, same
 "before returning" ordering, same no-`try`-around-`signDigest` rule as T-2.
 
-**Verify** `pure` — byte equality against `w.signMessage(message)` for the same message and key
-(FC-E7 — "verifies identically" is asserted as byte-identical output, which is strictly stronger).
-Cases: ASCII, empty string, a multi-byte UTF-8 string (so the prefix's byte-length rather than
-character-length is exercised), and a `0x`-prefixed string that must be treated as **text**, not as
-bytes — the case a hand-rolled prefix implementation gets wrong. Mismatch and propagation cases as
-in T-2, plus the `signDigest` call counter at exactly `1`.
+Both operations live in one file and share `assertRecoveredAddress`, which stays **module-private**
+— T-3 needed no new export for it, and widening the surface for a helper the spec never names would
+work against FC-E8.
+
+**Verify** `pure` — **44/44 assertions passed**, run from outside the repo tree against the built
+`dist/cjs`.
+Byte equality against `signMessage` for the same key holds across six message shapes: ASCII, empty
+string, multi-byte UTF-8 (`héllo — 世界 🚀`), a `0x`-prefixed 32-byte hex string, control characters
+(newline, CR, tab), and a 2KB message. For each, the recovered address equals the signer, the
+`signDigest` counter is exactly `1`, and **the digest passed is asserted equal to `hashMessage(m)`**
+— not merely well-formed, so ES-8 is checked against ethers' own value rather than against a
+plausible-looking 32 bytes.
+The two cases a hand-rolled prefix gets wrong are asserted directly: the `0x`-prefixed string is
+hashed as **text** (its digest differs from that of the same value hex-decoded to bytes) and is the
+one our code passes; and `hashMessage('é') !== hashMessage('e')`, confirming the prefix counts
+**bytes**, not characters.
+ES-9: a second wallet's `address` → `ES_SIGNATURE_MISMATCH`, not narrowable as `SwapError`, counter
+at `1`. Accepted: checksummed, all-lowercase, `0x`+all-uppercase. Rejected as
+`ES_SIGNATURE_MISMATCH` rather than as an untyped throw: `'bad'`, `''`, `null`, `undefined`.
+ES-10: a `CryptnoxCardError`-shaped rejection comes back as the same instance with `.code` intact
+and is not an `ExternalSignerError`.
+`review` — T-2's 29 assertions re-run green after this change (no regression). ES-13 confirmed by
+grep over the code (comments excluded): **no** `try`/`catch`, no `0x19`/`Ethereum Signed
+Message`/`toUtf8Bytes` concatenation, no `v - 27`, no key material; exactly two digest computations
+in the file (`keccak256(unsignedSerialized)`, `hashMessage`) and exactly two `signDigest` call
+sites, one per operation. Both operations resolve from the bare entry point;
+`assertRecoveredAddress` is `undefined` on the barrel.
 **Depends on:** T-1
 
 ---

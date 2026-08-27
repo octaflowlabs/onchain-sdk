@@ -11,19 +11,27 @@
  *           parses it and broadcastTransaction accepts it unchanged
  *  - ES-7   the recovered address is computed from the signature alone and compared to
  *           signer.address; ES_SIGNATURE_MISMATCH before anything is returned
+ *  - ES-8   the message digest is ethers.hashMessage — the same EIP-191 prefixing signMessage
+ *           already applies; never a hand-written prefix concatenation
+ *  - ES-9   ES-7's recovered-address check applies to signMessageWithSigner under the same code
  *  - ES-10  signDigest's rejection propagates unchanged — no try/catch on that call
+ *  - ES-13  both entry points share one digest computation per operation, taken from ethers
+ *           (unsignedSerialized + keccak256 for a transaction, hashMessage for a message), and
+ *           one recovered-address check
  *  - ES-14  an under-resolved tx raises ES_UNRESOLVED_TRANSACTION before signDigest is called
  *  - FC-E1  serialized signed transaction that broadcastTransaction accepts unchanged
- *  - FC-E2  signDigest is called exactly once, with a 0x-prefixed 32-byte digest and nothing else
+ *  - FC-E2  signDigest is called exactly once per operation, with a 0x-prefixed 32-byte digest
+ *           and nothing else
  *  - FC-E3  the 65-byte r ‖ s ‖ v signature is converted by Signature.from, which derives both
  *           v and yParity; no arithmetic on v anywhere in this file
  *  - FC-E4  a distinguishable error rather than a transaction signed by an unexpected key
- *  - FC-E5  no private key is required, derived or accepted on this path
+ *  - FC-E5  no private key is required, derived or accepted on either path
+ *  - FC-E7  signMessageWithSigner's output is byte-identical to signMessage's for the same key
  *  - FC-E8  exported from the package entry point
  */
 
 /** npm imports */
-import { Transaction, Signature, keccak256 } from 'ethers'
+import { Transaction, Signature, keccak256, hashMessage, verifyMessage } from 'ethers'
 
 /** local imports */
 import { TransactionRequest } from '../../types/common'
@@ -88,6 +96,21 @@ export const signTransactionWithSigner = async (
   const serialized = populated.serialized
 
   assertRecoveredAddress(Transaction.from(serialized).from, signer, digest)
+
+  return serialized
+}
+
+export const signMessageWithSigner = async (
+  signer: ExternalSigner,
+  message: string,
+): Promise<string> => {
+  const digest = hashMessage(message)
+
+  const signature = await signer.signDigest(digest)
+
+  const serialized = Signature.from(signature).serialized
+
+  assertRecoveredAddress(verifyMessage(message, serialized), signer, digest)
 
   return serialized
 }

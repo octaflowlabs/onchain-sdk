@@ -58,7 +58,10 @@ export { EntropySource } from './services/evm-wallet-core/entropy'
 export { createWallet, signMessage, signTransaction } from './services/evm-wallet-core/signer'
 
 /** external signer exports */
-export { signTransactionWithSigner } from './services/evm-wallet-core/externalSigner'
+export {
+  signTransactionWithSigner,
+  signMessageWithSigner,
+} from './services/evm-wallet-core/externalSigner'
 export {
   ExternalSignerError,
   isExternalSignerError,
