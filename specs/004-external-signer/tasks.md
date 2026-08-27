@@ -54,7 +54,7 @@ The last row is the entire justification for ES-14. The second row corrected ES-
 
 ## Foundations
 
-### [ ] T-1 · `ExternalSigner`, `ExternalSignerError`, and the closed code set
+### [x] T-1 · `ExternalSigner`, `ExternalSignerError`, and the closed code set
 
 **Files:** `src/types/externalSigner.ts` (new), `src/signing/ExternalSignerError.ts` (new), `src/index.ts`
 **Satisfies:** ES-1, ES-11, FC-E8 · **Plan:** D-3, where this lives
@@ -73,13 +73,30 @@ deliberate.
 `'ES_UNRESOLVED_TRANSACTION'`. Both are raised by later tasks; both are declared here so the set is
 defined in one place.
 
-**Verify** `pure` — an exhaustive `switch` over `ExternalSignerErrorCode` with no `default` compiles
-clean under `tsc --strict --noEmit`, and `@ts-expect-error` confirms a third literal is rejected;
-asserted in a scratch file, compiled, then deleted. Construct one of each error class and assert the
-cross-guard both ways: `isExternalSignerError(new SwapError(...))` is `false` **and**
-`isSwapError(new ExternalSignerError(...))` is `false` — D-3's whole point, and it fails silently if
-a shared base creeps in later.
-`review` — all four symbols resolve from `src/index.ts`.
+`ExternalSignerErrorCode` lives in `ExternalSignerError.ts`, not in `types/`. This **departs from
+where `SwapErrorCode` sits** (`types/swap.ts`, imported by `SwapError.ts`) and follows T-6's export
+table instead: the closed set sits next to the only class that raises it. Recorded rather than left
+to be discovered as an inconsistency later.
+
+**Verify** `pure` — **18/18 assertions passed.** The exhaustive `switch` over
+`ExternalSignerErrorCode` with no `default` compiled clean under `tsc -p tsconfig.json --noEmit
+--strict`, in a scratch file inside `src/` (an out-of-tree file could not resolve the barrel
+import), then deleted. Exhaustiveness is confirmed _by the compiler's silence in a run where the
+same check was observed failing_: an earlier broken run raised `TS2366 Function lacks ending return
+statement`, so the clean run proves TS narrowed the union to nothing, not that the check was inert.
+Both `@ts-expect-error` directives were consumed — no `TS2578 Unused directive` — confirming a third
+code literal is rejected **and** that an object carrying a `privateKey` member is not assignable to
+`ExternalSigner` (ES-2 at the type level).
+Runtime, against the built `dist/cjs`: the D-3 cross-guard holds in all four directions —
+`isExternalSignerError(swapError)` and `isSwapError(externalSignerError)` are both `false`, and
+neither class is `instanceof` the other. Shape mirrors `SwapError`: `instanceof Error`, `name`,
+`code`, `message`, `details`, `details` optional when omitted, and the instance survives
+`throw`/`catch` identity. The guard returns `false` for `null`, `undefined`, a bare code string, a
+duck-typed `{ code }` object, and a plain `Error`.
+`review` — imported **from outside the repo tree** (a `node -e` run from the scratch directory, as
+001's T-12 established): `ExternalSignerError` and `isExternalSignerError` resolve as functions from
+the bare entry point. All four symbols present in both `dist/index.d.ts` and `dist/cjs/index.d.ts`;
+`dist/types/externalSigner.d.ts` and `ExternalSignerErrorCode` both emitted.
 **Depends on:** —
 
 ---
